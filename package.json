@@ -6,6 +6,7 @@
     "dev": "bun --hot server/index.ts",
     "start": "NODE_ENV=production bun server/index.ts",
     "build": "bun build ./index.html --outdir dist --minify --splitting",
+    "build:api": "bun build server/vercel.ts --target=node --format=esm --outfile=api/index.js",
     "importar": "bun scripts/importar-xlsx.ts",
     "typecheck": "tsc --noEmit"
   },

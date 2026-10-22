@@ -1,4 +1,4 @@
-import { api } from "../server/handlers";
+import { api } from "./handlers";
 
 // vercel.json reescreve /api/* para cá, passando o caminho original em ?p=
 export default {
