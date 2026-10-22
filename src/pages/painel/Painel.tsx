@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
 import { Logo } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
+import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
 import { PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import { anosDisponiveis, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
@@ -68,6 +69,7 @@ export default function Painel() {
 
   return (
     <main className="app-painel">
+      <AvisoOffline />
       <header className="cabecalho">
         <div className="marca">
           <Logo tamanho={40} />
@@ -84,6 +86,7 @@ export default function Painel() {
           ))}
         </nav>
         <div className="cab-acoes">
+          <InstalarBotao sobreEscuro />
           <button className="link claro" onClick={carregar}>Atualizar</button>
           <button className="link claro" onClick={sair}>Sair</button>
           <TemaBotao sobreEscuro />

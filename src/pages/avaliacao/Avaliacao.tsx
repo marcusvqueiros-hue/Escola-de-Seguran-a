@@ -14,6 +14,7 @@ import { Fundo, Logo } from "../../components/Logo";
 import CapturaFoto from "./CapturaFoto";
 import NomeCombo from "./NomeCombo";
 import { TemaBotao } from "../../lib/tema";
+import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import { chaveNome } from "../../shared/texto";
 import type { Local } from "./carimbo";
 
@@ -170,6 +171,7 @@ export default function Avaliacao() {
   return (
     <main className="app-avaliacao">
       <Fundo />
+      <AvisoOffline />
       <header className="topo">
         <Logo tamanho={38} />
         <span className="topo-titulo">Escola de Segurança</span>
@@ -179,6 +181,7 @@ export default function Avaliacao() {
           </span>
         )}
         <span className="topo-fim">
+          <InstalarBotao />
           <TemaBotao />
         </span>
       </header>

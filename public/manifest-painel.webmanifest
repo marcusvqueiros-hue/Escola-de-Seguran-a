@@ -1,0 +1,17 @@
+{
+  "id": "/painel",
+  "name": "Painel · Escola de Segurança CGB",
+  "short_name": "Painel Escola",
+  "description": "Dashboard administrativo da Escola de Segurança.",
+  "lang": "pt-BR",
+  "start_url": "/painel?origem=pwa",
+  "scope": "/painel",
+  "display": "standalone",
+  "background_color": "#f6f3f4",
+  "theme_color": "#84162b",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

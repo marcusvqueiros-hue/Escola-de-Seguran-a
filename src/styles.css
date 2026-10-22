@@ -454,3 +454,13 @@ em { font-style: normal; color: var(--vinho); }
 .cartao-login { text-align: center; }
 .cartao-login .logo { justify-self: center; }
 .cartao-login .campo { text-align: left; }
+
+/* ---------- PWA ---------- */
+.instalar-wrap { position: relative; display: inline-flex; margin-right: 8px; }
+.instalar-btn { height: 40px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--vinho); background: var(--vinho); color: #fff; font-weight: 650; font-size: 13px; white-space: nowrap; }
+.instalar-btn.claro { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.3); }
+.instalar-dica { position: absolute; right: 0; top: calc(100% + 8px); width: 240px; padding: 10px 12px; border-radius: 12px; background: var(--card); color: var(--texto); box-shadow: var(--sombra); font-size: 12.5px; z-index: 20; }
+.topo-fim { align-items: center; }
+.aviso-offline { position: sticky; top: 0; z-index: 30; background: var(--aviso-bg); color: var(--aviso-txt); text-align: center; padding: 8px 14px; font-size: 13px; font-weight: 600; }
+@media (max-width: 480px) { .instalar-btn { padding: 0 10px; font-size: 12px; } }
+@media (display-mode: standalone) { body { overscroll-behavior-y: contain; } .topo { padding-top: max(16px, env(safe-area-inset-top)); } }
