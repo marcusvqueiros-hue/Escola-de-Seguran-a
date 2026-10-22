@@ -4,3 +4,8 @@ data
 .env.*
 dist
 .vercel
+
+.env*
+.agents
+.claude/skills
+skills-lock.json
