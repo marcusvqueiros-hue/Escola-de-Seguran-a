@@ -435,3 +435,8 @@ em { font-style: normal; color: var(--vinho); }
   .kpi strong { font-size: 30px; }
 }
 .recharts-pie-label-text { fill: var(--texto); font-size: 11px; font-weight: 700; }
+
+/* logotipo: sobre fundos escuros ou vinho ganha uma base clara para manter o contraste */
+.logo img { display: block; }
+.cabecalho .logo, :root[data-tema="escuro"] .logo { background: #fff; padding: 6px 12px; border-radius: 12px; }
+.cabecalho .logo img { filter: none; }
