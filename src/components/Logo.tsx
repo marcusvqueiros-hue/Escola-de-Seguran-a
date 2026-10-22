@@ -10,28 +10,6 @@ export function Logo({ tamanho = 44 }: { tamanho?: number; texto?: boolean }) {
   );
 }
 
-const TELHAS: [string, string][] = [
-  ["198,0 297,99 198,198 99,99", "#721626"],
-  ["0,198 99,99 198,198 99,297", "#a01840"],
-  ["198,198 297,99 398,198 297,297", "#7e162b"],
-  ["0,198 99,297 0,397", "#c0245a"],
-  ["398,198 398,397 297,297", "#a01840"],
-  ["99,297 198,397 99,496 0,397", "#a01840"],
-  ["297,297 398,397 297,496 198,397", "#7e162b"],
-  ["198,397 297,496 198,596 99,496", "#721626"],
-];
-
-/** Forma geométrica inspirada no símbolo da CGB (losango de telhas com vazado no centro). */
-function FormaCGB({ className }: { className: string }) {
-  return (
-    <svg className={`forma-cgb ${className}`} viewBox="0 0 398 596" aria-hidden>
-      {TELHAS.map(([pts, cor]) => (
-        <polygon key={pts} points={pts} fill={cor} />
-      ))}
-    </svg>
-  );
-}
-
 interface No { x: number; y: number; vx: number; vy: number; r: number }
 interface Pulso { a: number; b: number; t: number; v: number }
 
@@ -143,9 +121,6 @@ export function Fundo() {
       <i className="blob b1" />
       <i className="blob b2" />
       <i className="blob b3" />
-      <FormaCGB className="f1" />
-      <FormaCGB className="f2" />
-      <FormaCGB className="f3" />
       <RedeNeural />
     </div>
   );

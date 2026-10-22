@@ -441,15 +441,7 @@ em { font-style: normal; color: var(--vinho); }
 .cabecalho .logo, :root[data-tema="escuro"] .logo { background: #fff; padding: 6px 12px; border-radius: 12px; }
 .cabecalho .logo img { filter: none; }
 
-/* fundo: formas CGB em movimento + rede neural (substitui grade e partículas) */
+/* fundo: rede neural animada */
 .grade, .particula { display: none; }
 .rede { position: absolute; inset: 0; width: 100%; height: 100%; }
-.forma-cgb { position: absolute; opacity: 0.13; will-change: transform; }
-.forma-cgb.f1 { width: min(34vmax, 420px); left: -6vmax; top: 8vh; animation: gira1 38s ease-in-out infinite alternate; }
-.forma-cgb.f2 { width: min(26vmax, 320px); right: -4vmax; bottom: 6vh; animation: gira2 46s ease-in-out -12s infinite alternate; }
-.forma-cgb.f3 { width: min(14vmax, 170px); right: 22vw; top: 6vh; opacity: 0.1; animation: gira3 30s ease-in-out -5s infinite alternate; }
-@keyframes gira1 { from { transform: translate(0, 0) rotate(-8deg); } to { transform: translate(6vw, -5vh) rotate(10deg) scale(1.08); } }
-@keyframes gira2 { from { transform: translate(0, 0) rotate(12deg); } to { transform: translate(-7vw, 6vh) rotate(-9deg) scale(0.92); } }
-@keyframes gira3 { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(-4vw, 8vh) rotate(24deg) scale(1.15); } }
-:root[data-tema="escuro"] .forma-cgb { opacity: 0.1; }
-@media (max-width: 640px) { .forma-cgb.f3 { display: none; } .forma-cgb.f1 { width: 70vw; } .forma-cgb.f2 { width: 55vw; } }
+.logo { justify-self: start; }
