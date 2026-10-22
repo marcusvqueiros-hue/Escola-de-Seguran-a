@@ -12,6 +12,9 @@ import {
 import { QUESTOES } from "../../shared/questoes";
 import { Fundo, Logo } from "../../components/Logo";
 import CapturaFoto from "./CapturaFoto";
+import NomeCombo from "./NomeCombo";
+import { TemaBotao } from "../../lib/tema";
+import { chaveNome } from "../../shared/texto";
 import type { Local } from "./carimbo";
 
 type Etapa = "nome" | "dados" | "regras" | "prova" | "foto" | "fim";
@@ -23,6 +26,7 @@ interface Salvo {
   prazo?: number;
   respostas: (Resposta | null)[];
   idx: number;
+  doCadastro?: boolean;
   resultado?: Resultado;
 }
 
@@ -51,7 +55,6 @@ export default function Avaliacao() {
   const [carregando, setCarregando] = useState(false);
   const [agora, setAgora] = useState(Date.now());
   const [tempoEsgotado, setTempoEsgotado] = useState(false);
-  const inputNome = useRef<HTMLInputElement>(null);
 
   const atualizar = (p: Partial<Salvo>) => setS((x) => ({ ...x, ...p }));
   useEffect(() => {
@@ -74,16 +77,44 @@ export default function Avaliacao() {
     }
   }, [agora, s.etapa, s.prazo]);
 
-  useEffect(() => {
-    if (s.etapa === "nome") inputNome.current?.focus();
-  }, [s.etapa]);
-
   const { ident } = s;
   const setIdent = (p: Partial<Identificacao>) => atualizar({ ident: { ...ident, ...p } });
   const primeiroNome = ident.nome.trim().split(" ")[0] ?? "";
   const nomeOk = ident.nome.trim().split(/\s+/).filter((p) => p.length > 1).length >= 2;
   const dadosOk = ident.matricula.trim() && ident.prefixo.trim() && ident.funcao.trim() && ident.base && ident.gerencia;
   const respondidas = s.respostas.filter(Boolean).length;
+
+  async function preencher(id: number, nome?: string) {
+    try {
+      const d = await (await fetch(`/api/colaboradores/${id}`)).json();
+      atualizar({
+        doCadastro: true,
+        ident: { nome: d.nome, matricula: d.matricula ?? "", prefixo: d.prefixo ?? "", funcao: d.funcao ?? "", base: d.base ?? "", gerencia: d.gerencia ?? "" },
+      });
+    } catch {
+      atualizar({ doCadastro: false, ident: { ...ident, nome: nome ?? ident.nome } });
+    }
+  }
+
+  /** Avança para a confirmação; se o nome digitado existir no cadastro, já traz os dados. */
+  async function continuarNome() {
+    if (!nomeOk || carregando) return;
+    if (!s.doCadastro) {
+      setCarregando(true);
+      try {
+        const d = await (await fetch(`/api/colaboradores?q=${encodeURIComponent(ident.nome.trim())}`)).json();
+        const exato = (d.resultados ?? []).find((r: { nome: string }) => chaveNome(r.nome) === chaveNome(ident.nome));
+        if (exato) {
+          await preencher(exato.id);
+          atualizar({ etapa: "dados" });
+          return;
+        }
+      } catch {} finally {
+        setCarregando(false);
+      }
+    }
+    atualizar({ etapa: "dados" });
+  }
 
   async function iniciar() {
     setErro(null);
@@ -147,6 +178,9 @@ export default function Avaliacao() {
             <i /> {s.etapa === "prova" ? mmss(restante) : "00:00"}
           </span>
         )}
+        <span className="topo-fim">
+          <TemaBotao />
+        </span>
       </header>
 
       {s.etapa !== "fim" && (
@@ -164,20 +198,17 @@ export default function Avaliacao() {
             <h1>
               Qual é o seu <em>nome</em>?
             </h1>
-            <label className="campo-grande">
-              <input
-                ref={inputNome}
-                value={ident.nome}
-                onChange={(e) => setIdent({ nome: e.target.value.toUpperCase() })}
-                onKeyDown={(e) => e.key === "Enter" && nomeOk && atualizar({ etapa: "dados" })}
-                placeholder="Nome completo"
-                autoComplete="name"
-                autoCapitalize="characters"
-              />
-              <span className="linha" />
-            </label>
-            <p className={`dica ${ident.nome && !nomeOk ? "vis" : ""}`}>Digite nome e sobrenome.</p>
-            <button className="btn" disabled={!nomeOk} onClick={() => atualizar({ etapa: "dados" })}>
+            <NomeCombo
+              valor={ident.nome}
+              onChange={(nome) => atualizar({ doCadastro: false, ident: { ...vazio, nome } })}
+              onEscolher={(sug) => {
+                atualizar({ ident: { ...ident, nome: sug.nome } });
+                preencher(sug.id, sug.nome);
+              }}
+              onEnter={continuarNome}
+            />
+            <p className={`dica ${ident.nome && !nomeOk ? "vis" : ""}`}>Digite nome e sobrenome e escolha na lista.</p>
+            <button className="btn" disabled={!nomeOk || carregando} onClick={continuarNome}>
               Continuar <span aria-hidden>→</span>
             </button>
           </div>
@@ -187,6 +218,11 @@ export default function Avaliacao() {
           <div className="cartao entra">
             <p className="sobre">Olá, {primeiroNome}</p>
             <h1>Confirme seus <em>dados</em></h1>
+            {s.doCadastro ? (
+              <p className="cadastro-ok">✓ Dados encontrados no cadastro. Confira e corrija se algo mudou.</p>
+            ) : (
+              <p className="sub">Não encontramos seu nome no cadastro. Preencha os dados abaixo.</p>
+            )}
             <div className="duas">
               <label className="campo">
                 <span>Matrícula</span>

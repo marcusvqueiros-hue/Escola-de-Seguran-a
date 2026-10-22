@@ -11,18 +11,18 @@ React + Bun. Um único servidor entrega dois links:
 
 ```bash
 bun install
-bun run dev      # desenvolvimento (http://localhost:3000)
-bun run start    # produção
+vercel env pull .env.local   # traz DATABASE_URL (Postgres/Neon); defina ADMIN_USER e ADMIN_PASS em .env
+bun run dev                  # http://localhost:3000
 ```
 
-Variáveis opcionais: `PORT`, `HOST`, `DATA_DIR` (padrão `./data`), `ADMIN_USER`, `ADMIN_PASS`.
+Publicar na Vercel: `bun run build:api` (gera api/index.js), commit e `vercel deploy --prod`.
 
-> **HTTPS é obrigatório em produção.** Câmera e GPS só funcionam em `https://` (ou `localhost`).
-> Publique atrás de um proxy/host com certificado (Cloudflare Tunnel, Caddy, Nginx, Railway, Fly…).
+> **HTTPS é obrigatório em produção** para câmera e GPS (a Vercel já entrega HTTPS).
 
 ## Dados
 
-- Banco SQLite em `data/escola.db`, fotos em `data/fotos/` (faça backup dessa pasta).
+- Banco Postgres (Neon, via Vercel). Tabelas: `tentativas`, `fotos`, `colaboradores` (cadastro usado no autocompletar do login) e `falhas_login`.
+- O cadastro de colaboradores é provisório: foi montado a partir das respostas do Forms e é atualizado a cada avaliação concluída.
 - Na primeira execução com o banco vazio, as 45 respostas do Forms são importadas de `server/seed.json`.
   Para reimportar outra planilha: `bun run importar "caminho.xlsx"`, apague `data/` e reinicie.
 - O gabarito fica só no servidor (`server/gabarito.ts`); o navegador nunca recebe as respostas corretas.

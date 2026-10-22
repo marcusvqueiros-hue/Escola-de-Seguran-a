@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Fundo, Logo } from "../../components/Logo";
+import { TemaBotao } from "../../lib/tema";
 
 export default function Login({ onEntrar }: { onEntrar: () => void }) {
   const [usuario, setUsuario] = useState("");
@@ -28,6 +29,7 @@ export default function Login({ onEntrar }: { onEntrar: () => void }) {
   return (
     <main className="app-login">
       <Fundo />
+      <TemaBotao flutuante />
       <form className={`cartao-login ${tremer ? "tremer" : ""}`} key={tremer} onSubmit={entrar}>
         <Logo tamanho={52} />
         <h1>Painel <em>Escola de Segurança</em></h1>

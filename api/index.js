@@ -6002,6 +6002,9 @@ var seed_default = [
   }
 ];
 
+// src/shared/texto.ts
+var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+
 // server/db.ts
 var url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url)
@@ -6032,12 +6035,33 @@ function iniciarBanco() {
       )`;
     await sql`CREATE TABLE IF NOT EXISTS fotos (id TEXT PRIMARY KEY, dados TEXT NOT NULL)`;
     await sql`CREATE TABLE IF NOT EXISTS falhas_login (ip TEXT PRIMARY KEY, n INTEGER NOT NULL, ate BIGINT NOT NULL)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS colaboradores (
+        id        SERIAL PRIMARY KEY,
+        nome      TEXT NOT NULL,
+        nome_norm TEXT NOT NULL UNIQUE,
+        matricula TEXT,
+        prefixo   TEXT,
+        funcao    TEXT,
+        base      TEXT,
+        gerencia  TEXT
+      )`;
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM tentativas WHERE origem = 'importado'`;
     if (n === 0) {
       await sql.transaction(seed_default.map((r, i) => sql`
             INSERT INTO tentativas (id, iniciada_em, finalizada_em, nome, matricula, prefixo, funcao, base, gerencia, respostas, origem)
             VALUES (${`seed-${i + 1}`}, ${r.criadoEm}, ${r.criadoEm}, ${r.nome}, ${r.matricula}, ${r.prefixo}, ${r.funcao}, ${r.base}, ${r.gerencia}, ${JSON.stringify(r.respostas)}, 'importado')
             ON CONFLICT (id) DO NOTHING`));
+    }
+    const [{ c }] = await sql`SELECT COUNT(*)::int AS c FROM colaboradores`;
+    if (c === 0) {
+      const ultimo = new Map;
+      for (const r of [...seed_default].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)))
+        ultimo.set(chaveNome(r.nome), r);
+      await sql.transaction([...ultimo].map(([norm, r]) => sql`
+            INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
+            VALUES (${r.nome}, ${norm}, ${r.matricula}, ${r.prefixo}, ${r.funcao}, ${r.base}, ${r.gerencia})
+            ON CONFLICT (nome_norm) DO NOTHING`));
     }
   })().catch((e) => {
     pronto = null;
@@ -6222,6 +6246,10 @@ async function finalizar(req) {
           duracao_seg = ${Math.min(decorrido, DURACAO_SEG)}, tem_foto = TRUE, local = ${local}, lat = ${lat}, lng = ${lng},
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`
   ]);
+  await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
+            VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
+            ON CONFLICT (nome_norm) DO UPDATE SET matricula = EXCLUDED.matricula, prefixo = EXCLUDED.prefixo,
+              funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia`;
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
 }
@@ -6254,6 +6282,22 @@ async function api(req) {
   const rota = pathname.replace(/\/+$/, "");
   try {
     await iniciarBanco();
+    if (rota === "/api/colaboradores" && req.method === "GET") {
+      const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
+      if (q.length < 2)
+        return json({ resultados: [] });
+      const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+      const padrao = `%${seguro}%`;
+      const inicio = `${seguro}%`;
+      const rs = await sql`SELECT id, nome, base FROM colaboradores WHERE nome_norm LIKE ${padrao}
+                            ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
+      return json({ resultados: rs });
+    }
+    const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
+    if (colab && req.method === "GET") {
+      const [c] = await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM colaboradores WHERE id = ${Number(colab)}`;
+      return c ? json(c) : erro("Colaborador não encontrado.", 404);
+    }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST")
       return await iniciar(req);
     if (rota === "/api/avaliacao/finalizar" && req.method === "POST")

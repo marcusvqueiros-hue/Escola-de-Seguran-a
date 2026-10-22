@@ -13,6 +13,7 @@ import {
   type Resposta,
 } from "../src/shared/constantes";
 import { QUESTOES } from "../src/shared/questoes";
+import { chaveNome } from "../src/shared/texto";
 
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -76,6 +77,11 @@ async function finalizar(req: Request) {
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`,
   ]);
 
+  await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
+            VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
+            ON CONFLICT (nome_norm) DO UPDATE SET matricula = EXCLUDED.matricula, prefixo = EXCLUDED.prefixo,
+              funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia`;
+
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
 }
@@ -111,6 +117,21 @@ export async function api(req: Request): Promise<Response> {
   try {
     await iniciarBanco();
 
+    if (rota === "/api/colaboradores" && req.method === "GET") {
+      const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
+      if (q.length < 2) return json({ resultados: [] });
+      const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+      const padrao = `%${seguro}%`;
+      const inicio = `${seguro}%`;
+      const rs = await sql`SELECT id, nome, base FROM colaboradores WHERE nome_norm LIKE ${padrao}
+                            ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
+      return json({ resultados: rs });
+    }
+    const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
+    if (colab && req.method === "GET") {
+      const [c] = (await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM colaboradores WHERE id = ${Number(colab)}`) as any[];
+      return c ? json(c) : erro("Colaborador não encontrado.", 404);
+    }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST") return await iniciar(req);
     if (rota === "/api/avaliacao/finalizar" && req.method === "POST") return await finalizar(req);
 

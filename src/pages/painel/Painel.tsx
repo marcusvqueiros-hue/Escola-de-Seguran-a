@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
 import { Logo } from "../../components/Logo";
+import { TemaBotao } from "../../lib/tema";
 import Login from "./Login";
 import { PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import { anosDisponiveis, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
@@ -22,6 +23,7 @@ export default function Painel() {
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [filtro, setFiltro] = useState<Filtro>({ ...semFiltro });
   const [erro, setErro] = useState<string | null>(null);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -84,10 +86,16 @@ export default function Painel() {
         <div className="cab-acoes">
           <button className="link claro" onClick={carregar}>Atualizar</button>
           <button className="link claro" onClick={sair}>Sair</button>
+          <TemaBotao sobreEscuro />
         </div>
       </header>
 
       <section className="filtros">
+        <button className="filtros-toggle" onClick={() => setFiltrosAbertos((a) => !a)} aria-expanded={filtrosAbertos}>
+          <span>Filtros{ativo ? " • ativos" : ""}</span>
+          <i>{filtrosAbertos ? "▲" : "▼"}</i>
+        </button>
+        <div className={`filtros-corpo ${filtrosAbertos ? "aberto" : ""}`}>
         <label>
           <span>Ano</span>
           <select value={filtro.ano ?? ""} onChange={(e) => setFiltro({ ...filtro, ano: e.target.value ? Number(e.target.value) : null })}>
@@ -111,6 +119,7 @@ export default function Painel() {
           <div>{BASES.map((b) => <button key={b} className={filtro.bases.includes(b) ? "on" : ""} onClick={() => setFiltro({ ...filtro, bases: alterna(filtro.bases, b) })}>{b}</button>)}</div>
         </div>
         <button className="limpar" disabled={!ativo} onClick={() => setFiltro({ ...semFiltro })}>Limpar filtros</button>
+        </div>
       </section>
 
       {erro && <p className="erro-msg centro">{erro}</p>}

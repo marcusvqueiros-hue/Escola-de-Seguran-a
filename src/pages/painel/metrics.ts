@@ -12,8 +12,8 @@ export interface Filtro {
 }
 export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [] };
 
-export const chaveNome = (n: string) =>
-  n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+export { chaveNome } from "../../shared/texto";
+import { chaveNome } from "../../shared/texto";
 
 export const media = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 export const fmt = (n: number, casas = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });

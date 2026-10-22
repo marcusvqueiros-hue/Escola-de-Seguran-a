@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTema } from "../../lib/tema";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const COR = {
@@ -23,13 +24,28 @@ export function Cartao({ titulo, children, className = "", alto = 260 }: { titul
 
 export const Vazio = () => <div className="vazio">Sem dados para os filtros selecionados</div>;
 
-const eixoX = { tick: { fontSize: 11, fontWeight: 700, fill: COR.vinho }, tickLine: false, axisLine: { stroke: "#e6dfe2" } } as const;
-const rotulo = { fontSize: 11, fontWeight: 700, fill: "#2b2630" } as const;
-const tooltip = { cursor: { fill: "rgba(132,22,43,.05)" }, contentStyle: { borderRadius: 10, border: "1px solid #eadfe3", fontSize: 12 } } as const;
+function usePaleta() {
+  const { tema } = useTema();
+  const escuro = tema === "escuro";
+  const destaque = escuro ? "#f0a9b8" : COR.vinho;
+  const rotulo = { fontSize: 11, fontWeight: 700, fill: escuro ? "#f1e9ec" : "#2b2630" } as const;
+  return {
+    escuro,
+    rotulo,
+    grade: escuro ? "#33282d" : "#f0e9ec",
+    eixoX: { tick: { fontSize: 11, fontWeight: 700, fill: destaque }, tickLine: false, axisLine: { stroke: escuro ? "#3a2e34" : "#e6dfe2" } } as const,
+    tooltip: {
+      cursor: { fill: escuro ? "rgba(240,169,184,.08)" : "rgba(132,22,43,.05)" },
+      contentStyle: { borderRadius: 10, border: `1px solid ${escuro ? "#3a2e34" : "#eadfe3"}`, fontSize: 12, background: escuro ? "#251c21" : "#fff", color: escuro ? "#f1e9ec" : "#1f1a22" },
+      itemStyle: { color: escuro ? "#f1e9ec" : "#1f1a22" },
+    } as const,
+  };
+}
 
 type Linha = { nome: string } & Record<string, number | string>;
 
 export function Colunas({ dados, chave = "valor", formato, cor = COR.verde, max }: { dados: Linha[]; chave?: string; formato?: (n: number) => string; cor?: string; max?: number }) {
+  const { eixoX, rotulo, tooltip } = usePaleta();
   if (!dados.length) return <Vazio />;
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -46,6 +62,7 @@ export function Colunas({ dados, chave = "valor", formato, cor = COR.verde, max 
 }
 
 export function ColunasDuplas({ dados }: { dados: Linha[] }) {
+  const { eixoX, rotulo, tooltip } = usePaleta();
   if (!dados.length) return <Vazio />;
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -66,11 +83,12 @@ export function ColunasDuplas({ dados }: { dados: Linha[] }) {
 }
 
 export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: string }) {
+  const { eixoX, rotulo, tooltip, grade } = usePaleta();
   if (!dados.length) return <Vazio />;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={dados} margin={{ top: 24, right: 24, left: 24, bottom: 4 }}>
-        <CartesianGrid vertical={false} stroke="#f0e9ec" />
+        <CartesianGrid vertical={false} stroke={grade} />
         <XAxis dataKey="nome" {...eixoX} interval={0} />
         <YAxis hide domain={[0, "auto"]} />
         <Tooltip {...tooltip} />
@@ -83,11 +101,12 @@ export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: str
 }
 
 export function Rosca({ dados, cores = PALETA }: { dados: { nome: string; valor: number }[]; cores?: string[] }) {
+  const { tooltip } = usePaleta();
   const total = dados.reduce((a, d) => a + d.valor, 0);
   if (!total) return <Vazio />;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+      <PieChart margin={{ top: 16, right: 44, bottom: 8, left: 44 }}>
         <Tooltip contentStyle={tooltip.contentStyle} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} verticalAlign="bottom" />
         <Pie
@@ -100,8 +119,7 @@ export function Rosca({ dados, cores = PALETA }: { dados: { nome: string; valor:
           stroke="none"
           label={(p: any) => `${p.name} ${p.value} (${Math.round((p.value / total) * 100)}%)`}
           labelLine
-          style={{ fontSize: 11, fontWeight: 700 }}
-          animationDuration={800}
+                    animationDuration={800}
         >
           {dados.map((_, i) => (
             <Cell key={i} fill={cores[i % cores.length]} />
