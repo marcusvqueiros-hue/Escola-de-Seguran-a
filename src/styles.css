@@ -436,10 +436,6 @@ em { font-style: normal; color: var(--vinho); }
 }
 .recharts-pie-label-text { fill: var(--texto); font-size: 11px; font-weight: 700; }
 
-/* logotipo: sobre fundos escuros ou vinho ganha uma base clara para manter o contraste */
-.logo img { display: block; }
-.cabecalho .logo, :root[data-tema="escuro"] .logo { background: #fff; padding: 6px 12px; border-radius: 12px; }
-.cabecalho .logo img { filter: none; }
 
 /* fundo: rede neural animada */
 .grade, .particula { display: none; }
@@ -449,3 +445,12 @@ em { font-style: normal; color: var(--vinho); }
 @keyframes gira1 { from { transform: translate(0, 0) rotate(-8deg); } to { transform: translate(6vw, -5vh) rotate(10deg) scale(1.08); } }
 :root[data-tema="escuro"] .forma-cgb { opacity: 0.1; }
 @media (max-width: 640px) { .forma-cgb { width: 70vw; } }
+
+/* logotipo sem base branca: nas áreas escuras só as letras são clareadas */
+.logo { display: inline-flex; gap: 0; }
+.logo i { display: block; background-repeat: no-repeat; flex: none; }
+:root[data-tema="escuro"] .logo-letras, .cabecalho .logo-letras { filter: brightness(0) invert(0.94); }
+.cabecalho .logo-icone { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 8px rgba(255, 255, 255, 0.45)); }
+.cartao-login { text-align: center; }
+.cartao-login .logo { justify-self: center; }
+.cartao-login .campo { text-align: left; }

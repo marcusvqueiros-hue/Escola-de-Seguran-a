@@ -1,11 +1,18 @@
 import { useEffect, useRef } from "react";
 import logo from "../assets/logo-cgb.png";
 
-/** Logotipo oficial da CGB; `tamanho` é a altura em px. */
+/**
+ * Logotipo oficial da CGB (imagem original, sem alterar forma nem tipografia).
+ * Ícone e letras são recortes da mesma imagem, o que permite clarear só as letras sobre fundos escuros.
+ * `tamanho` é a altura em px.
+ */
 export function Logo({ tamanho = 44 }: { tamanho?: number; texto?: boolean }) {
+  const u = tamanho / 596;
+  const base = { backgroundImage: `url(${logo})`, backgroundSize: `${1500 * u}px ${596 * u}px`, height: tamanho };
   return (
-    <span className="logo">
-      <img src={logo} alt="CGB" height={tamanho} style={{ height: tamanho, width: "auto" }} />
+    <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
+      <i className="logo-icone" style={{ ...base, width: 442 * u, backgroundPosition: "0 0" }} />
+      <i className="logo-letras" style={{ ...base, width: 1058 * u, backgroundPosition: `${-442 * u}px 0` }} />
     </span>
   );
 }
