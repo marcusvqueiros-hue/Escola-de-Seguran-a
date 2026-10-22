@@ -445,3 +445,7 @@ em { font-style: normal; color: var(--vinho); }
 .grade, .particula { display: none; }
 .rede { position: absolute; inset: 0; width: 100%; height: 100%; }
 .logo { justify-self: start; }
+.forma-cgb { position: absolute; opacity: 0.13; width: min(34vmax, 420px); left: -6vmax; top: 8vh; will-change: transform; animation: gira1 38s ease-in-out infinite alternate; }
+@keyframes gira1 { from { transform: translate(0, 0) rotate(-8deg); } to { transform: translate(6vw, -5vh) rotate(10deg) scale(1.08); } }
+:root[data-tema="escuro"] .forma-cgb { opacity: 0.1; }
+@media (max-width: 640px) { .forma-cgb { width: 70vw; } }
