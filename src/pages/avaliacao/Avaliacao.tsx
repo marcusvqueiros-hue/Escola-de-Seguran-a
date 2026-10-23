@@ -199,6 +199,7 @@ export default function Avaliacao() {
         {s.etapa === "nome" && (
           <div className="cartao entra intro">
             <Logo tamanho={84} neon />
+            <p className="marca-titulo">Escola de Segurança<em>Avaliação</em></p>
             <p className="sobre">Bem-vindo(a)</p>
             <h1>
               Qual é o seu <em>nome</em>?
@@ -222,6 +223,7 @@ export default function Avaliacao() {
         {s.etapa === "dados" && (
           <div className="cartao entra intro">
             <Logo tamanho={84} neon />
+            <p className="marca-titulo">Escola de Segurança<em>Avaliação</em></p>
             <p className="sobre">Olá, {primeiroNome}</p>
             <h1>Confirme seus <em>dados</em></h1>
             {s.doCadastro ? (
@@ -270,6 +272,7 @@ export default function Avaliacao() {
         {s.etapa === "regras" && (
           <div className="cartao entra intro">
             <Logo tamanho={84} neon />
+            <p className="marca-titulo">Escola de Segurança<em>Avaliação</em></p>
             <p className="sobre">Antes de começar</p>
             <h1>Como funciona a <em>avaliação</em></h1>
             <ul className="regras">

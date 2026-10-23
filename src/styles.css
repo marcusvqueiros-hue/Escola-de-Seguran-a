@@ -489,3 +489,5 @@ em { font-style: normal; color: var(--vinho); }
 .cartao.intro .campo, .cartao.intro .grupo, .cartao.intro .duas, .cartao.intro .regras, .cartao.intro .campo-grande input { text-align: left; }
 .cartao.intro .campo-grande input { text-align: center; }
 .cartao.intro .chips { justify-content: flex-start; }
+.marca-titulo { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin: -4px 0 2px; }
+.marca-titulo em { display: block; }
