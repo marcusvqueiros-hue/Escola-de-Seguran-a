@@ -72,7 +72,7 @@ export default function Painel() {
       <AvisoOffline />
       <header className="cabecalho">
         <div className="marca">
-          <Logo tamanho={44} neon />
+          <Logo tamanho={44} neon tom="sobreVinho" />
           <div>
             <h1>{ABAS.find((a) => a.id === aba)!.rotulo}</h1>
             <small>Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>

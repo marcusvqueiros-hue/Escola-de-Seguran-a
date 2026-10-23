@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
+import { useTema } from "../lib/tema";
 import logo from "../assets/logo-cgb.png";
 
 /**
@@ -6,7 +7,21 @@ import logo from "../assets/logo-cgb.png";
  * Ícone e letras são recortes da mesma imagem, o que permite clarear só as letras sobre fundos escuros.
  * `tamanho` é a altura em px.
  */
-export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?: boolean; neon?: boolean }) {
+const rgba = (hex: string, a: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+};
+
+// Cores originais da marca (vinho do símbolo e cinza das letras), em tons que mantêm contraste em cada fundo.
+const PALETAS = {
+  claro: { s: "#a01840", l: "#4a4a49" },
+  escuro: { s: "#e24a74", l: "#dcdcd8" },
+  sobreVinho: { s: "#ffc9d8", l: "#ffffff" },
+};
+
+export function Logo({ tamanho = 44, neon = false, tom = "auto" }: { tamanho?: number; texto?: boolean; neon?: boolean; tom?: "auto" | "sobreVinho" }) {
+  const { tema } = useTema();
+  const fid = useId().replace(/:/g, "");
   const u = tamanho / 596;
   const base = { backgroundImage: `url(${logo})`, backgroundSize: `${1500 * u}px ${596 * u}px`, height: tamanho };
   const letras = <i className="logo-letras" style={{ ...base, width: 1058 * u, backgroundPosition: `${-442 * u}px 0` }} />;
@@ -21,16 +36,25 @@ export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?:
   // Versão neon: linhas finas na forma original. O símbolo é redesenhado telha a telha (com as arestas internas
   // visíveis) e as letras viram contorno com um leve preenchimento; o brilho "respira".
   const linha = Math.max(1.1, tamanho / 50);
+  const pal = tom === "sobreVinho" ? PALETAS.sobreVinho : PALETAS[tema];
+  const vars = {
+    ["--cs" as string]: pal.s,
+    ["--cs-g" as string]: rgba(pal.s, 0.55),
+    ["--cs-f" as string]: rgba(pal.s, 0.3),
+    ["--cl" as string]: pal.l,
+    ["--cl-g" as string]: rgba(pal.l, 0.55),
+    ["--cl-f" as string]: rgba(pal.l, 0.3),
+  };
   const raio = Math.max(0.8, tamanho / 76);
   return (
-    <span className="logo-neon">
+    <span className="logo-neon" style={vars}>
       <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
-        <filter id="logo-contorno" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
+        <filter id={`contorno-${fid}`} x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
           <feMorphology in="SourceAlpha" operator="erode" radius={raio} result="miolo" />
           <feComposite in="SourceAlpha" in2="miolo" operator="out" result="borda" />
-          <feFlood style={{ floodColor: "var(--neon-letras)" }} result="cor" />
+          <feFlood floodColor={pal.l} result="cor" />
           <feComposite in="cor" in2="borda" operator="in" result="linha" />
-          <feFlood style={{ floodColor: "var(--neon-letras)" }} floodOpacity="0.08" result="cor2" />
+          <feFlood floodColor={pal.l} floodOpacity="0.08" result="cor2" />
           <feComposite in="cor2" in2="SourceAlpha" operator="in" result="preench" />
           <feMerge>
             <feMergeNode in="preench" />
@@ -42,11 +66,13 @@ export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?:
         <span className="neon-parte simbolo">
           <svg viewBox="0 0 442 596" width={442 * u} height={tamanho} className="logo-icone-neon" aria-hidden>
             {TELHAS.map(([pts]) => (
-              <polygon key={pts} points={pts} fill="none" strokeWidth={linha} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+              <polygon key={pts} points={pts} fill={pal.s} fillOpacity={0.08} stroke={pal.s} strokeWidth={linha} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
             ))}
           </svg>
         </span>
-        <span className="neon-parte letras">{letras}</span>
+        <span className="neon-parte letras">
+          <span style={{ display: "inline-flex", filter: `url(#contorno-${fid})` }}>{letras}</span>
+        </span>
       </span>
     </span>
   );
