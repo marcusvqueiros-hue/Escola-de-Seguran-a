@@ -9,25 +9,45 @@ import logo from "../assets/logo-cgb.png";
 export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?: boolean; neon?: boolean }) {
   const u = tamanho / 596;
   const base = { backgroundImage: `url(${logo})`, backgroundSize: `${1500 * u}px ${596 * u}px`, height: tamanho };
-  const marca = (
-    <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
-      <i className="logo-icone" style={{ ...base, width: 442 * u, backgroundPosition: "0 0" }} />
-      <i className="logo-letras" style={{ ...base, width: 1058 * u, backgroundPosition: `${-442 * u}px 0` }} />
-    </span>
-  );
-  if (!neon) return marca;
-  // Versão vazada: só o contorno da forma original, em neon, com brilho que "respira".
+  const letras = <i className="logo-letras" style={{ ...base, width: 1058 * u, backgroundPosition: `${-442 * u}px 0` }} />;
+  if (!neon) {
+    return (
+      <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
+        <i className="logo-icone" style={{ ...base, width: 442 * u, backgroundPosition: "0 0" }} />
+        {letras}
+      </span>
+    );
+  }
+  // Versão neon: linhas finas na forma original. O símbolo é redesenhado telha a telha (com as arestas internas
+  // visíveis) e as letras viram contorno com um leve preenchimento; o brilho "respira".
+  const linha = Math.max(1, tamanho / 62);
+  const raio = Math.max(0.7, tamanho / 92);
   return (
-    <span className="logo-neon" style={{ ["--esp" as string]: `${Math.max(1.4, tamanho / 34)}px` }}>
+    <span className="logo-neon">
       <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
-        <filter id="logo-contorno" x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
-          <feMorphology in="SourceAlpha" operator="erode" radius={Math.max(1.4, tamanho / 34)} result="miolo" />
+        <filter id="logo-contorno" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
+          <feMorphology in="SourceAlpha" operator="erode" radius={raio} result="miolo" />
           <feComposite in="SourceAlpha" in2="miolo" operator="out" result="borda" />
           <feFlood style={{ floodColor: "var(--neon)" }} result="cor" />
-          <feComposite in="cor" in2="borda" operator="in" />
+          <feComposite in="cor" in2="borda" operator="in" result="linha" />
+          <feFlood style={{ floodColor: "var(--neon)" }} floodOpacity="0.1" result="cor2" />
+          <feComposite in="cor2" in2="SourceAlpha" operator="in" result="preench" />
+          <feMerge>
+            <feMergeNode in="preench" />
+            <feMergeNode in="linha" />
+          </feMerge>
         </filter>
       </svg>
-      <span className="logo-neon-vaza">{marca}</span>
+      <span className="logo-neon-vaza">
+        <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
+          <svg viewBox="0 0 442 596" width={442 * u} height={tamanho} className="logo-icone-neon" aria-hidden>
+            {TELHAS.map(([pts]) => (
+              <polygon key={pts} points={pts} fill="none" strokeWidth={linha} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+            ))}
+          </svg>
+          {letras}
+        </span>
+      </span>
     </span>
   );
 }

@@ -465,19 +465,34 @@ em { font-style: normal; color: var(--vinho); }
 @media (max-width: 480px) { .instalar-btn { padding: 0 10px; font-size: 12px; } }
 @media (display-mode: standalone) { body { overscroll-behavior-y: contain; } .topo { padding-top: max(16px, env(safe-area-inset-top)); } }
 
-/* ---------- logo neon vazada (contorno que respira) ---------- */
+/* ---------- logo neon: linhas finas, brilho suave que respira ---------- */
 :root { --neon: #c2224a; }
 :root[data-tema="escuro"] { --neon: #ff6b92; }
 .cabecalho { --neon: #ffd9e2; }
-.logo-neon { display: inline-flex; position: relative; }
-.logo-neon .logo { filter: url(#logo-contorno); }
-.logo-neon-vaza { display: inline-flex; animation: respira 3.6s ease-in-out infinite; }
-@keyframes respira {
-  0%, 100% { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 7px var(--neon)); opacity: 0.78; }
-  50% { filter: drop-shadow(0 0 5px var(--neon)) drop-shadow(0 0 20px var(--neon)) drop-shadow(0 0 34px var(--neon)); opacity: 1; }
+.logo-neon { display: inline-flex; position: relative; isolation: isolate; }
+.logo-neon::before {
+  content: ""; position: absolute; inset: -55% -25%; z-index: -1; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--neon) 34%, transparent), transparent 72%);
+  animation: aura 4.4s ease-in-out infinite;
 }
-.logo-neon .logo-letras, .logo-neon .logo-icone { filter: none !important; }
-.cabecalho .logo-neon .logo-icone { filter: none; }
-.cartao-login .logo-neon { justify-self: center; margin: 6px 0 4px; }
+.logo-neon-vaza { display: inline-flex; animation: respira 4.4s ease-in-out infinite; }
+.logo-neon .logo-letras { filter: url(#logo-contorno) !important; }
+.logo-icone-neon { display: block; flex: none; overflow: visible; }
+.logo-icone-neon polygon { stroke: var(--neon); fill: color-mix(in srgb, var(--neon) 9%, transparent); }
+@keyframes respira {
+  0%, 100% { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--neon) 70%, transparent)) drop-shadow(0 0 5px color-mix(in srgb, var(--neon) 45%, transparent)); opacity: 0.72; }
+  50% { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 9px color-mix(in srgb, var(--neon) 80%, transparent)) drop-shadow(0 0 20px color-mix(in srgb, var(--neon) 50%, transparent)); opacity: 1; }
+}
+@keyframes aura { 0%, 100% { opacity: 0.25; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1.06); } }
+.fundo::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 70% 55% at 50% 12%, color-mix(in srgb, var(--neon) 20%, transparent), transparent 70%);
+  animation: aura-fundo 4.4s ease-in-out infinite;
+}
+@keyframes aura-fundo { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
+.cartao-login .logo-neon { justify-self: center; margin: 10px 0 6px; }
 @media (max-width: 480px) { .instalar-txt { display: none; } .instalar-btn { width: 40px; padding: 0; } .topo { gap: 6px; } }
-@media (prefers-reduced-motion: reduce) { .logo-neon-vaza { animation: none; filter: drop-shadow(0 0 4px var(--neon)) drop-shadow(0 0 12px var(--neon)); } }
+@media (prefers-reduced-motion: reduce) {
+  .logo-neon-vaza, .logo-neon::before, .fundo::after { animation: none; }
+  .logo-neon-vaza { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 9px color-mix(in srgb, var(--neon) 60%, transparent)); }
+}
