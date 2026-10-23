@@ -20,17 +20,17 @@ export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?:
   }
   // Versão neon: linhas finas na forma original. O símbolo é redesenhado telha a telha (com as arestas internas
   // visíveis) e as letras viram contorno com um leve preenchimento; o brilho "respira".
-  const linha = Math.max(1, tamanho / 62);
-  const raio = Math.max(0.7, tamanho / 92);
+  const linha = Math.max(1.1, tamanho / 50);
+  const raio = Math.max(0.8, tamanho / 76);
   return (
     <span className="logo-neon">
       <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
         <filter id="logo-contorno" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
           <feMorphology in="SourceAlpha" operator="erode" radius={raio} result="miolo" />
           <feComposite in="SourceAlpha" in2="miolo" operator="out" result="borda" />
-          <feFlood style={{ floodColor: "var(--neon)" }} result="cor" />
+          <feFlood style={{ floodColor: "var(--neon-letras)" }} result="cor" />
           <feComposite in="cor" in2="borda" operator="in" result="linha" />
-          <feFlood style={{ floodColor: "var(--neon)" }} floodOpacity="0.05" result="cor2" />
+          <feFlood style={{ floodColor: "var(--neon-letras)" }} floodOpacity="0.08" result="cor2" />
           <feComposite in="cor2" in2="SourceAlpha" operator="in" result="preench" />
           <feMerge>
             <feMergeNode in="preench" />
@@ -38,15 +38,15 @@ export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?:
           </feMerge>
         </filter>
       </svg>
-      <span className="logo-neon-vaza">
-        <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
+      <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
+        <span className="neon-parte simbolo">
           <svg viewBox="0 0 442 596" width={442 * u} height={tamanho} className="logo-icone-neon" aria-hidden>
             {TELHAS.map(([pts]) => (
               <polygon key={pts} points={pts} fill="none" strokeWidth={linha} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
             ))}
           </svg>
-          {letras}
         </span>
+        <span className="neon-parte letras">{letras}</span>
       </span>
     </span>
   );

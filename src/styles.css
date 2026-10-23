@@ -465,19 +465,21 @@ em { font-style: normal; color: var(--vinho); }
 @media (max-width: 480px) { .instalar-btn { padding: 0 10px; font-size: 12px; } }
 @media (display-mode: standalone) { body { overscroll-behavior-y: contain; } .topo { padding-top: max(16px, env(safe-area-inset-top)); } }
 
-/* ---------- logo: contorno fino em uma cor, brilho discreto ---------- */
-:root { --neon: #a8324e; }
-:root[data-tema="escuro"] { --neon: #e8899f; }
-.cabecalho { --neon: #f3c9d3; }
+/* ---------- logo neon: cores originais da marca (vinho e cinza), adaptadas ao tema ---------- */
+:root { --neon-simbolo: #a01840; --neon-letras: #4a4a49; }
+:root[data-tema="escuro"] { --neon-simbolo: #e24a74; --neon-letras: #dcdcd8; }
+.cabecalho { --neon-simbolo: #ffc9d8; --neon-letras: #ffffff; }
 .logo-neon { display: inline-flex; position: relative; }
-.logo-neon-vaza { display: inline-flex; animation: respira 6s ease-in-out infinite; }
+.neon-parte { display: inline-flex; animation: respira 5s ease-in-out infinite; }
+.neon-parte.simbolo { --c: var(--neon-simbolo); }
+.neon-parte.letras { --c: var(--neon-letras); }
 .logo-neon .logo-letras { filter: url(#logo-contorno) !important; }
 .logo-icone-neon { display: block; flex: none; overflow: visible; }
-.logo-icone-neon polygon { stroke: var(--neon); fill: color-mix(in srgb, var(--neon) 5%, transparent); }
+.logo-icone-neon polygon { stroke: var(--neon-simbolo); fill: color-mix(in srgb, var(--neon-simbolo) 8%, transparent); }
 @keyframes respira {
-  0%, 100% { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--neon) 22%, transparent)); opacity: 0.86; }
-  50% { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--neon) 38%, transparent)); opacity: 1; }
+  0%, 100% { opacity: 0.62; filter: drop-shadow(0 0 1px color-mix(in srgb, var(--c) 30%, transparent)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 8px color-mix(in srgb, var(--c) 55%, transparent)); }
 }
 .cartao-login .logo-neon { justify-self: center; margin: 10px 0 6px; }
 @media (max-width: 480px) { .instalar-txt { display: none; } .instalar-btn { width: 40px; padding: 0; } .topo { gap: 6px; } }
-@media (prefers-reduced-motion: reduce) { .logo-neon-vaza { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .neon-parte { animation: none; filter: drop-shadow(0 0 2px var(--c)); } }
