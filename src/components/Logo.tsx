@@ -30,7 +30,7 @@ export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?:
           <feComposite in="SourceAlpha" in2="miolo" operator="out" result="borda" />
           <feFlood style={{ floodColor: "var(--neon)" }} result="cor" />
           <feComposite in="cor" in2="borda" operator="in" result="linha" />
-          <feFlood style={{ floodColor: "var(--neon)" }} floodOpacity="0.1" result="cor2" />
+          <feFlood style={{ floodColor: "var(--neon)" }} floodOpacity="0.05" result="cor2" />
           <feComposite in="cor2" in2="SourceAlpha" operator="in" result="preench" />
           <feMerge>
             <feMergeNode in="preench" />
@@ -127,12 +127,12 @@ function RedeNeural() {
       const dt = Math.min(0.05, (agora - ultimo) / 1000);
       ultimo = agora;
       const escuro = document.documentElement.dataset.tema === "escuro";
-      const rgb = escuro ? "240,169,184" : "132,22,43";
+      const rgb = escuro ? "232,137,159" : "168,50,78";
       ctx.clearRect(0, 0, w, h);
 
       const alcance = w < 640 ? 150 : 210;
       ponteiro.forca += ((ponteiro.ativo ? 1 : 0) - ponteiro.forca) * Math.min(1, dt * 6);
-      const neon = escuro ? "255,122,160" : "194,34,74";
+      const neon = escuro ? "232,137,159" : "168,50,78";
 
       for (const no of nos) {
         no.x += no.vx * dt;
@@ -176,7 +176,7 @@ function RedeNeural() {
           .slice(0, 12);
         ctx.lineWidth = 1.3;
         for (const { n, d } of perto) {
-          ctx.strokeStyle = `rgba(${neon},${(1 - d / alcance) * 0.85 * ponteiro.forca})`;
+          ctx.strokeStyle = `rgba(${neon},${(1 - d / alcance) * 0.45 * ponteiro.forca})`;
           ctx.beginPath();
           ctx.moveTo(ponteiro.x, ponteiro.y);
           ctx.lineTo(n.x, n.y);
@@ -184,7 +184,7 @@ function RedeNeural() {
         }
         ctx.lineWidth = 1;
         const halo = ctx.createRadialGradient(ponteiro.x, ponteiro.y, 0, ponteiro.x, ponteiro.y, 46);
-        halo.addColorStop(0, `rgba(${neon},${0.35 * ponteiro.forca})`);
+        halo.addColorStop(0, `rgba(${neon},${0.14 * ponteiro.forca})`);
         halo.addColorStop(1, `rgba(${neon},0)`);
         ctx.fillStyle = halo;
         ctx.beginPath();
@@ -195,7 +195,7 @@ function RedeNeural() {
       for (const no of nos) {
         const d = ponteiro.forca > 0.02 ? Math.hypot(no.x - ponteiro.x, no.y - ponteiro.y) : 1e9;
         const realce = d < alcance ? (1 - d / alcance) * ponteiro.forca : 0;
-        ctx.fillStyle = realce > 0.02 ? `rgba(${neon},${0.5 + realce * 0.5})` : `rgba(${rgb},${escuro ? 0.55 : 0.4})`;
+        ctx.fillStyle = realce > 0.02 ? `rgba(${neon},${0.45 + realce * 0.3})` : `rgba(${rgb},${escuro ? 0.55 : 0.4})`;
         ctx.beginPath();
         ctx.arc(no.x, no.y, no.r + realce * 2.2, 0, Math.PI * 2);
         ctx.fill();
@@ -214,8 +214,8 @@ function RedeNeural() {
         if (p.a >= 0 && Math.hypot(A.x - B.x, A.y - B.y) > dist) { p.t = 1; continue; }
         const x = A.x + (B.x - A.x) * p.t, y = A.y + (B.y - A.y) * p.t;
         const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
-        g.addColorStop(0, `rgba(${escuro ? "255,200,210" : "208,69,101"},0.9)`);
-        g.addColorStop(1, `rgba(${escuro ? "255,200,210" : "208,69,101"},0)`);
+        g.addColorStop(0, `rgba(${escuro ? "232,137,159" : "168,50,78"},0.55)`);
+        g.addColorStop(1, `rgba(${escuro ? "232,137,159" : "168,50,78"},0)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);

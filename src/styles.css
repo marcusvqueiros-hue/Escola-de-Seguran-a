@@ -18,7 +18,7 @@
   --ok-borda: #b8dcd3;
   --fundo-1: #fbf7f8;
   --fundo-2: #f3eaed;
-  --blob: 0.55;
+  --blob: 0.26;
   color-scheme: light;
   --verde: #137e6a;
   --vermelho: #d64550;
@@ -50,8 +50,8 @@ em { font-style: normal; color: var(--vinho); }
 .fundo { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; background: linear-gradient(160deg, var(--fundo-1), var(--fundo-2)); }
 .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: var(--blob); }
 .b1 { width: 46vmax; height: 46vmax; left: -12vmax; top: -14vmax; background: #e06a80; animation: flutua 18s ease-in-out infinite alternate; }
-.b2 { width: 38vmax; height: 38vmax; right: -10vmax; top: 18vh; background: #5cc0aa; opacity: 0.4; animation: flutua 22s ease-in-out -6s infinite alternate-reverse; }
-.b3 { width: 34vmax; height: 34vmax; left: 24vw; bottom: -16vmax; background: #8a2640; opacity: 0.35; animation: flutua 26s ease-in-out -12s infinite alternate; }
+.b2 { width: 38vmax; height: 38vmax; right: -10vmax; top: 18vh; background: #e06a80; opacity: 0.14; animation: flutua 22s ease-in-out -6s infinite alternate-reverse; }
+.b3 { width: 34vmax; height: 34vmax; left: 24vw; bottom: -16vmax; background: #c0526a; opacity: 0.16; animation: flutua 26s ease-in-out -12s infinite alternate; }
 @keyframes flutua {
   0% { transform: translate3d(0, 0, 0) scale(1); }
   50% { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); }
@@ -370,7 +370,7 @@ em { font-style: normal; color: var(--vinho); }
   --verde: #2aa68d;
   --fundo-1: #171115;
   --fundo-2: #1d1418;
-  --blob: 0.28;
+  --blob: 0.16;
   --sombra: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
@@ -399,7 +399,7 @@ em { font-style: normal; color: var(--vinho); }
 .combo-lista li[aria-selected="true"], .combo-lista li:hover { background: var(--vinho-claro); color: var(--vinho); }
 .combo-lista mark { background: none; color: var(--vinho); font-weight: 800; }
 .cadastro-ok { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--verde); background: var(--ok-bg); border-radius: 12px; padding: 9px 12px; }
-:root[data-tema="escuro"] .b2, :root[data-tema="escuro"] .b3 { opacity: 0.16; }
+:root[data-tema="escuro"] .b2, :root[data-tema="escuro"] .b3 { opacity: 0.08; }
 .app-login > .tema-flutuante { position: fixed; }
 
 .filtros-corpo { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: end; }
@@ -441,9 +441,9 @@ em { font-style: normal; color: var(--vinho); }
 .grade, .particula { display: none; }
 .rede { position: absolute; inset: 0; width: 100%; height: 100%; }
 .logo { justify-self: start; }
-.forma-cgb { position: absolute; opacity: 0.13; width: min(34vmax, 420px); left: -6vmax; top: 8vh; will-change: transform; animation: gira1 38s ease-in-out infinite alternate; }
+.forma-cgb { position: absolute; opacity: 0.07; width: min(34vmax, 420px); left: -6vmax; top: 8vh; will-change: transform; animation: gira1 38s ease-in-out infinite alternate; }
 @keyframes gira1 { from { transform: translate(0, 0) rotate(-8deg); } to { transform: translate(6vw, -5vh) rotate(10deg) scale(1.08); } }
-:root[data-tema="escuro"] .forma-cgb { opacity: 0.1; }
+:root[data-tema="escuro"] .forma-cgb { opacity: 0.06; }
 @media (max-width: 640px) { .forma-cgb { width: 70vw; } }
 
 /* logotipo sem base branca: nas áreas escuras só as letras são clareadas */
@@ -465,34 +465,19 @@ em { font-style: normal; color: var(--vinho); }
 @media (max-width: 480px) { .instalar-btn { padding: 0 10px; font-size: 12px; } }
 @media (display-mode: standalone) { body { overscroll-behavior-y: contain; } .topo { padding-top: max(16px, env(safe-area-inset-top)); } }
 
-/* ---------- logo neon: linhas finas, brilho suave que respira ---------- */
-:root { --neon: #c2224a; }
-:root[data-tema="escuro"] { --neon: #ff6b92; }
-.cabecalho { --neon: #ffd9e2; }
-.logo-neon { display: inline-flex; position: relative; isolation: isolate; }
-.logo-neon::before {
-  content: ""; position: absolute; inset: -55% -25%; z-index: -1; pointer-events: none; border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--neon) 34%, transparent), transparent 72%);
-  animation: aura 4.4s ease-in-out infinite;
-}
-.logo-neon-vaza { display: inline-flex; animation: respira 4.4s ease-in-out infinite; }
+/* ---------- logo: contorno fino em uma cor, brilho discreto ---------- */
+:root { --neon: #a8324e; }
+:root[data-tema="escuro"] { --neon: #e8899f; }
+.cabecalho { --neon: #f3c9d3; }
+.logo-neon { display: inline-flex; position: relative; }
+.logo-neon-vaza { display: inline-flex; animation: respira 6s ease-in-out infinite; }
 .logo-neon .logo-letras { filter: url(#logo-contorno) !important; }
 .logo-icone-neon { display: block; flex: none; overflow: visible; }
-.logo-icone-neon polygon { stroke: var(--neon); fill: color-mix(in srgb, var(--neon) 9%, transparent); }
+.logo-icone-neon polygon { stroke: var(--neon); fill: color-mix(in srgb, var(--neon) 5%, transparent); }
 @keyframes respira {
-  0%, 100% { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--neon) 70%, transparent)) drop-shadow(0 0 5px color-mix(in srgb, var(--neon) 45%, transparent)); opacity: 0.72; }
-  50% { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 9px color-mix(in srgb, var(--neon) 80%, transparent)) drop-shadow(0 0 20px color-mix(in srgb, var(--neon) 50%, transparent)); opacity: 1; }
+  0%, 100% { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--neon) 22%, transparent)); opacity: 0.86; }
+  50% { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--neon) 38%, transparent)); opacity: 1; }
 }
-@keyframes aura { 0%, 100% { opacity: 0.25; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1.06); } }
-.fundo::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 70% 55% at 50% 12%, color-mix(in srgb, var(--neon) 20%, transparent), transparent 70%);
-  animation: aura-fundo 4.4s ease-in-out infinite;
-}
-@keyframes aura-fundo { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
 .cartao-login .logo-neon { justify-self: center; margin: 10px 0 6px; }
 @media (max-width: 480px) { .instalar-txt { display: none; } .instalar-btn { width: 40px; padding: 0; } .topo { gap: 6px; } }
-@media (prefers-reduced-motion: reduce) {
-  .logo-neon-vaza, .logo-neon::before, .fundo::after { animation: none; }
-  .logo-neon-vaza { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 9px color-mix(in srgb, var(--neon) 60%, transparent)); }
-}
+@media (prefers-reduced-motion: reduce) { .logo-neon-vaza { animation: none; } }
