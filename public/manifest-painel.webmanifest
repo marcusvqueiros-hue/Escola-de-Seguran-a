@@ -1,7 +1,7 @@
 {
   "id": "/painel",
-  "name": "Painel · Escola de Segurança CGB",
-  "short_name": "Painel Escola",
+  "name": "Relatórios · Escola de Segurança CGB",
+  "short_name": "Relatórios",
   "description": "Dashboard administrativo da Escola de Segurança.",
   "lang": "pt-BR",
   "start_url": "/painel?origem=pwa",

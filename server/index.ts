@@ -29,4 +29,4 @@ const server = Bun.serve({
 
 console.log(`Escola de Segurança no ar:
   Avaliação  → http://localhost:${server.port}/
-  Dashboard  → http://localhost:${server.port}/painel`);
+  Relatórios → http://localhost:${server.port}/painel`);

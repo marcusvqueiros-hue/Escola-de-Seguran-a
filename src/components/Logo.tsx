@@ -6,13 +6,28 @@ import logo from "../assets/logo-cgb.png";
  * Ícone e letras são recortes da mesma imagem, o que permite clarear só as letras sobre fundos escuros.
  * `tamanho` é a altura em px.
  */
-export function Logo({ tamanho = 44 }: { tamanho?: number; texto?: boolean }) {
+export function Logo({ tamanho = 44, neon = false }: { tamanho?: number; texto?: boolean; neon?: boolean }) {
   const u = tamanho / 596;
   const base = { backgroundImage: `url(${logo})`, backgroundSize: `${1500 * u}px ${596 * u}px`, height: tamanho };
-  return (
+  const marca = (
     <span className="logo" role="img" aria-label="CGB" style={{ height: tamanho }}>
       <i className="logo-icone" style={{ ...base, width: 442 * u, backgroundPosition: "0 0" }} />
       <i className="logo-letras" style={{ ...base, width: 1058 * u, backgroundPosition: `${-442 * u}px 0` }} />
+    </span>
+  );
+  if (!neon) return marca;
+  // Versão vazada: só o contorno da forma original, em neon, com brilho que "respira".
+  return (
+    <span className="logo-neon" style={{ ["--esp" as string]: `${Math.max(1.4, tamanho / 34)}px` }}>
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+        <filter id="logo-contorno" x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
+          <feMorphology in="SourceAlpha" operator="erode" radius={Math.max(1.4, tamanho / 34)} result="miolo" />
+          <feComposite in="SourceAlpha" in2="miolo" operator="out" result="borda" />
+          <feFlood style={{ floodColor: "var(--neon)" }} result="cor" />
+          <feComposite in="cor" in2="borda" operator="in" />
+        </filter>
+      </svg>
+      <span className="logo-neon-vaza">{marca}</span>
     </span>
   );
 }
@@ -52,6 +67,24 @@ function RedeNeural() {
     const parado = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let w = 0, h = 0, nos: No[] = [], pulsos: Pulso[] = [], raf = 0, ultimo = performance.now(), proximoPulso = 0;
     let dist = 150;
+    // ponteiro (mouse ou toque): vira um nó extra que puxa e conecta os nós próximos
+    const ponteiro = { x: 0, y: 0, ativo: false, forca: 0 };
+    const mover = (e: PointerEvent) => {
+      const r = canvas.getBoundingClientRect();
+      ponteiro.x = e.clientX - r.left;
+      ponteiro.y = e.clientY - r.top;
+      ponteiro.ativo = true;
+    };
+    const sair = () => (ponteiro.ativo = false);
+    const clicar = (e: PointerEvent) => {
+      mover(e);
+      const alvos = nos.map((n, i) => ({ i, d: Math.hypot(n.x - ponteiro.x, n.y - ponteiro.y) })).filter((a) => a.d < 240).slice(0, 10);
+      for (const a of alvos) pulsos.push({ a: -1, b: a.i, t: 0, v: 1.2 + Math.random() * 0.6 });
+    };
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerdown", clicar);
+    document.addEventListener("pointerleave", sair);
+    window.addEventListener("blur", sair);
 
     const montar = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -77,9 +110,22 @@ function RedeNeural() {
       const rgb = escuro ? "240,169,184" : "132,22,43";
       ctx.clearRect(0, 0, w, h);
 
+      const alcance = w < 640 ? 150 : 210;
+      ponteiro.forca += ((ponteiro.ativo ? 1 : 0) - ponteiro.forca) * Math.min(1, dt * 6);
+      const neon = escuro ? "255,122,160" : "194,34,74";
+
       for (const no of nos) {
         no.x += no.vx * dt;
         no.y += no.vy * dt;
+        if (ponteiro.forca > 0.02) {
+          const dx = ponteiro.x - no.x, dy = ponteiro.y - no.y;
+          const d = Math.hypot(dx, dy);
+          if (d < alcance && d > 1) {
+            const f = (1 - d / alcance) * 55 * ponteiro.forca * dt;
+            no.x += (dx / d) * f * 6;
+            no.y += (dy / d) * f * 6;
+          }
+        }
         if (no.x < -20) no.x = w + 20; else if (no.x > w + 20) no.x = -20;
         if (no.y < -20) no.y = h + 20; else if (no.y > h + 20) no.y = -20;
       }
@@ -101,10 +147,37 @@ function RedeNeural() {
         }
       }
 
-      for (const no of nos) {
-        ctx.fillStyle = `rgba(${rgb},${escuro ? 0.55 : 0.4})`;
+      // conexões do ponteiro com os nós ao redor
+      if (ponteiro.forca > 0.02) {
+        const perto = nos
+          .map((n) => ({ n, d: Math.hypot(n.x - ponteiro.x, n.y - ponteiro.y) }))
+          .filter((a) => a.d < alcance)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 12);
+        ctx.lineWidth = 1.3;
+        for (const { n, d } of perto) {
+          ctx.strokeStyle = `rgba(${neon},${(1 - d / alcance) * 0.85 * ponteiro.forca})`;
+          ctx.beginPath();
+          ctx.moveTo(ponteiro.x, ponteiro.y);
+          ctx.lineTo(n.x, n.y);
+          ctx.stroke();
+        }
+        ctx.lineWidth = 1;
+        const halo = ctx.createRadialGradient(ponteiro.x, ponteiro.y, 0, ponteiro.x, ponteiro.y, 46);
+        halo.addColorStop(0, `rgba(${neon},${0.35 * ponteiro.forca})`);
+        halo.addColorStop(1, `rgba(${neon},0)`);
+        ctx.fillStyle = halo;
         ctx.beginPath();
-        ctx.arc(no.x, no.y, no.r, 0, Math.PI * 2);
+        ctx.arc(ponteiro.x, ponteiro.y, 46, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const no of nos) {
+        const d = ponteiro.forca > 0.02 ? Math.hypot(no.x - ponteiro.x, no.y - ponteiro.y) : 1e9;
+        const realce = d < alcance ? (1 - d / alcance) * ponteiro.forca : 0;
+        ctx.fillStyle = realce > 0.02 ? `rgba(${neon},${0.5 + realce * 0.5})` : `rgba(${rgb},${escuro ? 0.55 : 0.4})`;
+        ctx.beginPath();
+        ctx.arc(no.x, no.y, no.r + realce * 2.2, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -117,8 +190,8 @@ function RedeNeural() {
       pulsos = pulsos.filter((p) => p.t < 1);
       for (const p of pulsos) {
         p.t += dt * p.v;
-        const A = nos[p.a]!, B = nos[p.b]!;
-        if (Math.hypot(A.x - B.x, A.y - B.y) > dist) { p.t = 1; continue; }
+        const A = p.a < 0 ? { x: ponteiro.x, y: ponteiro.y } : nos[p.a]!, B = nos[p.b]!;
+        if (p.a >= 0 && Math.hypot(A.x - B.x, A.y - B.y) > dist) { p.t = 1; continue; }
         const x = A.x + (B.x - A.x) * p.t, y = A.y + (B.y - A.y) * p.t;
         const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
         g.addColorStop(0, `rgba(${escuro ? "255,200,210" : "208,69,101"},0.9)`);
@@ -138,6 +211,10 @@ function RedeNeural() {
     return () => {
       cancelAnimationFrame(raf);
       obs.disconnect();
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerdown", clicar);
+      document.removeEventListener("pointerleave", sair);
+      window.removeEventListener("blur", sair);
     };
   }, []);
 

@@ -173,13 +173,14 @@ export default function Avaliacao() {
       <Fundo />
       <AvisoOffline />
       <header className="topo">
-        <Logo tamanho={38} />
-        <span className="topo-titulo">Escola de Segurança</span>
-        {(s.etapa === "prova" || s.etapa === "foto") && (
-          <span className={`relogio ${restante <= 120 && s.etapa === "prova" ? "alerta" : ""}`} aria-live="off">
-            <i /> {s.etapa === "prova" ? mmss(restante) : "00:00"}
-          </span>
-        )}
+        <div className="topo-esq">
+          {(s.etapa === "prova" || s.etapa === "foto") && (
+            <span className={`relogio ${restante <= 120 && s.etapa === "prova" ? "alerta" : ""}`} aria-live="off">
+              <i /> {s.etapa === "prova" ? mmss(restante) : "00:00"}
+            </span>
+          )}
+        </div>
+        <Logo tamanho={64} neon />
         <span className="topo-fim">
           <InstalarBotao />
           <TemaBotao />

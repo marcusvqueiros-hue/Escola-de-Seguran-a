@@ -31,8 +31,8 @@ export default function Login({ onEntrar }: { onEntrar: () => void }) {
       <Fundo />
       <TemaBotao flutuante />
       <form className={`cartao-login ${tremer ? "tremer" : ""}`} key={tremer} onSubmit={entrar}>
-        <Logo tamanho={52} />
-        <h1>Painel <em>Escola de Segurança</em></h1>
+        <Logo tamanho={84} neon />
+        <h1>Relatórios <em>Escola de Segurança</em></h1>
         <p className="sub">Acesso restrito à administração.</p>
         <label className="campo">
           <span>Usuário</span>

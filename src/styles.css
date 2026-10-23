@@ -118,12 +118,12 @@ em { font-style: normal; color: var(--vinho); }
 /* ---------- avaliação (colaborador) ---------- */
 .app-avaliacao, .app-login { position: relative; min-height: 100dvh; display: flex; flex-direction: column; }
 .app-avaliacao > *:not(.fundo), .app-login > *:not(.fundo) { position: relative; z-index: 1; }
-.topo { display: flex; align-items: center; gap: 12px; padding: 16px clamp(16px, 4vw, 40px); }
+.topo { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 14px clamp(16px, 4vw, 40px); }
+.topo-esq { display: flex; justify-content: flex-start; }
 .topo-titulo { font-weight: 650; color: var(--vinho); padding-left: 12px; border-left: 2px solid var(--borda); }
-.topo-fim { margin-left: auto; display: flex; }
-.relogio + .topo-fim { margin-left: 0; }
+.topo-fim { justify-self: end; display: flex; }
 .relogio {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--campo);
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--campo);
   font-variant-numeric: tabular-nums; font-weight: 750; box-shadow: var(--sombra);
 }
 .relogio i { width: 9px; height: 9px; border-radius: 50%; background: var(--verde); animation: pulsa 1.6s ease-in-out infinite; }
@@ -464,3 +464,20 @@ em { font-style: normal; color: var(--vinho); }
 .aviso-offline { position: sticky; top: 0; z-index: 30; background: var(--aviso-bg); color: var(--aviso-txt); text-align: center; padding: 8px 14px; font-size: 13px; font-weight: 600; }
 @media (max-width: 480px) { .instalar-btn { padding: 0 10px; font-size: 12px; } }
 @media (display-mode: standalone) { body { overscroll-behavior-y: contain; } .topo { padding-top: max(16px, env(safe-area-inset-top)); } }
+
+/* ---------- logo neon vazada (contorno que respira) ---------- */
+:root { --neon: #c2224a; }
+:root[data-tema="escuro"] { --neon: #ff6b92; }
+.cabecalho { --neon: #ffd9e2; }
+.logo-neon { display: inline-flex; position: relative; }
+.logo-neon .logo { filter: url(#logo-contorno); }
+.logo-neon-vaza { display: inline-flex; animation: respira 3.6s ease-in-out infinite; }
+@keyframes respira {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--neon)) drop-shadow(0 0 7px var(--neon)); opacity: 0.78; }
+  50% { filter: drop-shadow(0 0 5px var(--neon)) drop-shadow(0 0 20px var(--neon)) drop-shadow(0 0 34px var(--neon)); opacity: 1; }
+}
+.logo-neon .logo-letras, .logo-neon .logo-icone { filter: none !important; }
+.cabecalho .logo-neon .logo-icone { filter: none; }
+.cartao-login .logo-neon { justify-self: center; margin: 6px 0 4px; }
+@media (max-width: 480px) { .instalar-txt { display: none; } .instalar-btn { width: 40px; padding: 0; } .topo { gap: 6px; } }
+@media (prefers-reduced-motion: reduce) { .logo-neon-vaza { animation: none; filter: drop-shadow(0 0 4px var(--neon)) drop-shadow(0 0 12px var(--neon)); } }

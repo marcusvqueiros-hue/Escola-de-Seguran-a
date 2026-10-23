@@ -5,7 +5,7 @@ React + Bun. Um único servidor entrega dois links:
 | Link | Para quem | O que é |
 |---|---|---|
 | `/` | Colaboradores | Identificação → 10 questões (20 min) → foto carimbada → resultado |
-| `/painel` | Administração | Login + Escola de Segurança, Avaliação e Detalhamento |
+| `/painel` | Administração | Relatórios: login + Escola de Segurança, Avaliação e Detalhamento |
 
 ## Rodar
 

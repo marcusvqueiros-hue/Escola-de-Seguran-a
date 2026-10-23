@@ -60,8 +60,8 @@ export function InstalarBotao({ sobreEscuro = false }: { sobreEscuro?: boolean }
   if (!pode && !ios) return null;
   return (
     <span className="instalar-wrap">
-      <button type="button" className={`instalar-btn ${sobreEscuro ? "claro" : ""}`} onClick={() => (pode ? instalar() : setDica((d) => !d))}>
-        ⤓ Instalar app
+      <button type="button" className={`instalar-btn ${sobreEscuro ? "claro" : ""}`} onClick={() => (pode ? instalar() : setDica((d) => !d))} aria-label="Instalar app">
+        ⤓ <span className="instalar-txt">Instalar app</span>
       </button>
       {dica && <span className="instalar-dica">No Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”.</span>}
     </span>
