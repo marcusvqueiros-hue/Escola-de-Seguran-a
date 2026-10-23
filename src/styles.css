@@ -482,3 +482,10 @@ em { font-style: normal; color: var(--vinho); }
 .cartao-login .logo-neon { justify-self: center; margin: 10px 0 6px; }
 @media (max-width: 480px) { .instalar-txt { display: none; } .instalar-btn { width: 40px; padding: 0; } .topo { gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { .neon-parte { animation: none; } }
+
+/* telas iniciais da avaliação: logo e títulos centralizados, como no login dos Relatórios */
+.cartao.intro { text-align: center; }
+.cartao.intro .logo-neon { justify-self: center; margin: 6px 0 2px; }
+.cartao.intro .campo, .cartao.intro .grupo, .cartao.intro .duas, .cartao.intro .regras, .cartao.intro .campo-grande input { text-align: left; }
+.cartao.intro .campo-grande input { text-align: center; }
+.cartao.intro .chips { justify-content: flex-start; }

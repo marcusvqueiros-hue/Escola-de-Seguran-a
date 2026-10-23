@@ -180,7 +180,7 @@ export default function Avaliacao() {
             </span>
           )}
         </div>
-        <Logo tamanho={64} neon />
+        {["nome", "dados", "regras"].includes(s.etapa) ? <span /> : <Logo tamanho={56} neon />}
         <span className="topo-fim">
           <InstalarBotao />
           <TemaBotao />
@@ -197,7 +197,8 @@ export default function Avaliacao() {
 
       <section className="palco" key={s.etapa}>
         {s.etapa === "nome" && (
-          <div className="cartao entra">
+          <div className="cartao entra intro">
+            <Logo tamanho={84} neon />
             <p className="sobre">Bem-vindo(a)</p>
             <h1>
               Qual é o seu <em>nome</em>?
@@ -219,7 +220,8 @@ export default function Avaliacao() {
         )}
 
         {s.etapa === "dados" && (
-          <div className="cartao entra">
+          <div className="cartao entra intro">
+            <Logo tamanho={84} neon />
             <p className="sobre">Olá, {primeiroNome}</p>
             <h1>Confirme seus <em>dados</em></h1>
             {s.doCadastro ? (
@@ -266,7 +268,8 @@ export default function Avaliacao() {
         )}
 
         {s.etapa === "regras" && (
-          <div className="cartao entra">
+          <div className="cartao entra intro">
+            <Logo tamanho={84} neon />
             <p className="sobre">Antes de começar</p>
             <h1>Como funciona a <em>avaliação</em></h1>
             <ul className="regras">
