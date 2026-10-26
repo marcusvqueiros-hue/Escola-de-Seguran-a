@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Fundo, Logo } from "../../components/Logo";
+import { Fundo, Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
 
 export default function Login({ onEntrar }: { onEntrar: () => void }) {
@@ -48,6 +48,7 @@ export default function Login({ onEntrar }: { onEntrar: () => void }) {
         {erro && <p className="erro-msg">{erro}</p>}
         <button className="btn" disabled={enviando || !usuario || !senha}>{enviando ? "Entrando…" : "Entrar"}</button>
       </form>
+      <Rodape />
     </main>
   );
 }

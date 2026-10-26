@@ -10,7 +10,7 @@ import {
   type Resposta,
 } from "../../shared/constantes";
 import { QUESTOES } from "../../shared/questoes";
-import { Fundo, Logo } from "../../components/Logo";
+import { Fundo, Logo, Rodape } from "../../components/Logo";
 import CapturaFoto from "./CapturaFoto";
 import NomeCombo from "./NomeCombo";
 import { TemaBotao } from "../../lib/tema";
@@ -378,6 +378,7 @@ export default function Avaliacao() {
           </div>
         )}
       </section>
+      <Rodape />
     </main>
   );
 }

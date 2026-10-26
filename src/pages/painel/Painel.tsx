@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
-import { Logo } from "../../components/Logo";
+import { Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
 import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
@@ -132,6 +132,7 @@ export default function Painel() {
         {aba === "avaliacao" && <PaginaAvaliacao regs={filtrados} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} />}
       </div>
+      <Rodape />
     </main>
   );
 }

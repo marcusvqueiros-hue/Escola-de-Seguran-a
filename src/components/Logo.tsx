@@ -278,3 +278,12 @@ export function Fundo() {
     </div>
   );
 }
+
+/** Crédito do desenvolvedor, no rodapé de todas as telas. */
+export function Rodape() {
+  return (
+    <footer className="rodape">
+      Desenvolvido por <b>Marcus Vinicius Silva Queiros</b>
+    </footer>
+  );
+}
