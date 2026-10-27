@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
+import { COORDENADORES } from "../../shared/coordenadores";
 import { Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
 import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
@@ -59,7 +60,7 @@ export default function Painel() {
 
   const anos = useMemo(() => anosDisponiveis(regs), [regs]);
   const filtrados = useMemo(() => filtrar(regs, filtro), [regs, filtro]);
-  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0;
+  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0;
 
   if (auth === "checando") return <div className="carregando">Carregando…</div>;
   if (auth === "nao") return <Login onEntrar={carregar} />;
@@ -123,6 +124,10 @@ export default function Painel() {
         <div className="filtro-chips">
           <span>Base</span>
           <div>{BASES.map((b) => <button key={b} className={filtro.bases.includes(b) ? "on" : ""} onClick={() => setFiltro({ ...filtro, bases: alterna(filtro.bases, b) })}>{b}</button>)}</div>
+        </div>
+        <div className="filtro-chips">
+          <span>Coordenador</span>
+          <div>{COORDENADORES.map((c) => <button key={c} className={filtro.coordenadores.includes(c) ? "on" : ""} onClick={() => setFiltro({ ...filtro, coordenadores: alterna(filtro.coordenadores, c) })}>{c}</button>)}</div>
         </div>
         <button className="limpar" disabled={!ativo} onClick={() => setFiltro({ ...semFiltro })}>Limpar filtros</button>
         </div>

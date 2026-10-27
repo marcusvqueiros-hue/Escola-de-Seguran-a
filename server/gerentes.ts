@@ -1,27 +1,8 @@
 import { sql } from "./db";
 
-/**
- * Quem é o gerente de cada colaborador, conforme gerência e base.
- * `bases` vazio = vale para todas as bases da gerência. Nomes como informados pela operação.
- */
-export const REGRAS_GERENTES: { gerencia: string; bases?: string[]; gerente: string }[] = [
-  { gerencia: "GOMAN", bases: ["BCB", "STI", "ITM"], gerente: "LUIS C." },
-  { gerencia: "GOMAN", bases: ["PDS"], gerente: "THIAGO F." },
-  { gerencia: "GOMAN", bases: ["PDT"], gerente: "RAFAELA" },
-  { gerencia: "GOMAN", bases: ["BDC"], gerente: "JACKSON" },
-  { gerencia: "GERE", gerente: "ANTONIO M." },
-  { gerencia: "GSTC", bases: ["BCB", "ITM", "STI"], gerente: "AFONSO" },
-  { gerencia: "GSTC", bases: ["PDS", "PDT", "BDC"], gerente: "PAULO" },
-  { gerencia: "ADM", gerente: "PRYSCILLA" },
-  { gerencia: "ALMOXARIFE", gerente: "CAMILA" },
-  { gerencia: "FROTA", gerente: "RUAN" },
-  { gerencia: "SESMT", gerente: "DANIEL" },
-];
+import { REGRAS_COORDENADORES as REGRAS_GERENTES, gerenteDe } from "../src/shared/coordenadores";
 
-export function gerenteDe(gerencia: string, base: string): string {
-  const r = REGRAS_GERENTES.find((x) => x.gerencia === gerencia && (!x.bases || x.bases.includes(base)));
-  return r?.gerente ?? "";
-}
+export { gerenteDe };
 
 /** Redefine o gerente de todos (ou só de quem está sem gerente) pela regra acima. Devolve quantos mudaram. */
 export async function aplicarRegraGerentes(somenteVazios: boolean): Promise<number> {

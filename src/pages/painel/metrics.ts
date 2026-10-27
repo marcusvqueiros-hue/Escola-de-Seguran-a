@@ -9,8 +9,9 @@ export interface Filtro {
   mes: number | null; // 0-11
   gerencias: string[];
   bases: string[];
+  coordenadores: string[];
 }
-export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [] };
+export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [], coordenadores: [] };
 
 export { chaveNome } from "../../shared/texto";
 import { chaveNome } from "../../shared/texto";
@@ -25,7 +26,8 @@ export function filtrar(regs: Registro[], f: Filtro) {
       (f.ano == null || d.getFullYear() === f.ano) &&
       (f.mes == null || d.getMonth() === f.mes) &&
       (!f.gerencias.length || f.gerencias.includes(r.gerencia)) &&
-      (!f.bases.length || f.bases.includes(r.base))
+      (!f.bases.length || f.bases.includes(r.base)) &&
+      (!f.coordenadores.length || f.coordenadores.includes(r.coordenador))
     );
   });
 }
@@ -50,14 +52,14 @@ const rotuloMes = (k: string) => `${MESES[Number(k.slice(5)) - 1]}/${k.slice(2, 
 export const porMes = <T>(regs: Registro[], resumo: (rs: Registro[]) => T) =>
   agrupar(regs, chaveMes, (rs, k) => ({ k, nome: rotuloMes(k), ...resumo(rs) })).sort((a, b) => a.k.localeCompare(b.k));
 
-export const porCampo = <T>(regs: Registro[], campo: "base" | "gerencia", resumo: (rs: Registro[]) => T) =>
-  agrupar(regs, (r) => r[campo] || "—", (rs, k) => ({ nome: k, ...resumo(rs) }));
+export const porCampo = <T>(regs: Registro[], campo: "base" | "gerencia" | "coordenador", resumo: (rs: Registro[]) => T) =>
+  agrupar(regs, (r) => r[campo] || "SEM COORD.", (rs, k) => ({ nome: k, ...resumo(rs) }));
 
 /** Colaboradores com mais de uma participação (identificados pelo nome). */
 export function participacoes(regs: Registro[]) {
   return agrupar(regs, (r) => chaveNome(r.nome), (rs) => {
     const ult = [...rs].sort((a, b) => b.data.localeCompare(a.data))[0]!;
-    return { nome: ult.nome, qtd: rs.length, base: ult.base, gerencia: ult.gerencia };
+    return { nome: ult.nome, qtd: rs.length, base: ult.base, gerencia: ult.gerencia, coordenador: ult.coordenador || "SEM COORD." };
   }).sort((a, b) => b.qtd - a.qtd || a.nome.localeCompare(b.nome));
 }
 
@@ -101,7 +103,7 @@ export function rankingColaboradores(regs: Registro[]) {
         }
       }),
     );
-    return { nome: rs[0]!.nome, base: rs[0]!.base, gerencia: rs[0]!.gerencia, erros, questoes: [...questoes].sort((a, b) => a - b), tentativas: rs.length };
+    return { nome: rs[0]!.nome, base: rs[0]!.base, gerencia: rs[0]!.gerencia, coordenador: rs[0]!.coordenador, erros, questoes: [...questoes].sort((a, b) => a - b), tentativas: rs.length };
   })
     .filter((c) => c.erros > 0)
     .sort((a, b) => b.erros - a.erros || a.nome.localeCompare(b.nome));

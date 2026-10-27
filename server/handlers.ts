@@ -15,6 +15,7 @@ import {
 import { QUESTOES } from "../src/shared/questoes";
 import { chaveNome } from "../src/shared/texto";
 import { rotasColaboradores } from "./colaboradores";
+import { gerenteDe } from "../src/shared/coordenadores";
 
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -86,6 +87,8 @@ async function finalizar(req: Request) {
 
 async function registros(): Promise<Registro[]> {
   const linhas = (await sql`SELECT * FROM tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`) as any[];
+  // coordenador: o do cadastro (pelo nome); sem cadastro, o da regra de gerência e base
+  const cadastro = new Map(((await sql`SELECT nome_norm, gerente FROM colaboradores`) as { nome_norm: string; gerente: string | null }[]).map((c) => [c.nome_norm, c.gerente ?? ""]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]") as (Resposta | null)[];
     const { acertos, nota } = corrigir(respostas);
@@ -103,6 +106,7 @@ async function registros(): Promise<Registro[]> {
       nota,
       aprovado: nota >= NOTA_MINIMA,
       horas: HORAS_POR_PARTICIPACAO,
+      coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
       temFoto: l.tem_foto,
       local: l.local,
     };

@@ -42,6 +42,7 @@ export interface Registro extends Identificacao {
   nota: number;
   aprovado: boolean;
   horas: number;
+  coordenador: string;
   temFoto: boolean;
   local: string | null;
 }

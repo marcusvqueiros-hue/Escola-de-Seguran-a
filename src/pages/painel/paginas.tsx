@@ -22,7 +22,8 @@ export function PaginaEscola({ regs }: { regs: Registro[] }) {
   const gerencias = porCampo(regs, "gerencia", (rs) => ({ valor: rs.length })).sort(ordemBase);
   const pessoas = useMemo(() => participacoes(regs), [regs]);
   const reinc = pessoas.filter((p) => p.qtd > 1);
-  const reincPor = (campo: "base" | "gerencia") =>
+  const coordenadores = porCampo(regs, "coordenador", (rs) => ({ valor: rs.length })).sort(ordemBase);
+  const reincPor = (campo: "base" | "gerencia" | "coordenador") =>
     Object.entries(reinc.reduce<Record<string, number>>((a, p) => ((a[p[campo]] = (a[p[campo]] ?? 0) + 1), a), {}))
       .map(([nome, valor]) => ({ nome, valor }))
       .sort(ordemBase);
@@ -44,6 +45,8 @@ export function PaginaEscola({ regs }: { regs: Registro[] }) {
       <Cartao titulo="Horas por Mês"><Linhas dados={meses} chave="horas" /></Cartao>
       <Cartao titulo="Reincidência por Base"><Rosca dados={reincPor("base")} /></Cartao>
       <Cartao titulo="Reincidência por Gerência"><Rosca dados={reincPor("gerencia")} /></Cartao>
+      <Cartao titulo="Participantes por Coordenador" className="larga"><Colunas dados={coordenadores} /></Cartao>
+      <Cartao titulo="Reincidência por Coordenador"><Rosca dados={reincPor("coordenador")} /></Cartao>
     </div>
   );
 }
@@ -56,6 +59,8 @@ export function PaginaAvaliacao({ regs }: { regs: Registro[] }) {
   const gerencias = porCampo(regs, "gerencia", split).sort((a, b) => b.aprovados + b.reprovados - (a.aprovados + a.reprovados));
   const mediaBase = porCampo(regs, "base", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
   const mediaGer = porCampo(regs, "gerencia", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
+  const coords = porCampo(regs, "coordenador", split).sort((a, b) => b.aprovados + b.reprovados - (a.aprovados + a.reprovados));
+  const mediaCoord = porCampo(regs, "coordenador", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
   const reprovPorGer = gerencias.filter((g) => g.reprovados > 0).map((g) => ({ nome: g.nome, valor: g.reprovados }));
   const pessoas = mediaPorPessoa(regs);
 
@@ -76,6 +81,8 @@ export function PaginaAvaliacao({ regs }: { regs: Registro[] }) {
       <Cartao titulo="% de Reprovados"><Rosca dados={reprovPorGer} /></Cartao>
       <Cartao titulo="Avaliação por Base"><Colunas dados={mediaBase} formato={(n) => fmt(n)} max={10} /></Cartao>
       <Cartao titulo="Avaliação por Gerência"><Colunas dados={mediaGer} formato={(n) => fmt(n)} max={10} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Coordenador" className="larga"><ColunasDuplas dados={coords} /></Cartao>
+      <Cartao titulo="Avaliação por Coordenador"><Colunas dados={mediaCoord} formato={(n) => fmt(n)} max={10} /></Cartao>
     </div>
   );
 }
@@ -134,7 +141,7 @@ export function PaginaDetalhamento({ regs }: { regs: Registro[] }) {
             <li key={chaveNome(c.nome)}>
               <div>
                 <span className="pos">{i + 1}º</span>
-                <span className="txt"><b>{c.nome}</b><small>{c.base} · {c.gerencia}{c.tentativas > 1 ? ` · ${c.tentativas} avaliações` : ""}</small></span>
+                <span className="txt"><b>{c.nome}</b><small>{c.base} · {c.gerencia} · {c.coordenador || "SEM COORD."}{c.tentativas > 1 ? ` · ${c.tentativas} avaliações` : ""}</small></span>
                 <b className="erros">{c.erros}<small> erro{c.erros > 1 ? "s" : ""}</small></b>
               </div>
               <div className="tags">{c.questoes.map((q) => <i key={q}>Q{q}</i>)}</div>

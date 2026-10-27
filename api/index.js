@@ -6177,8 +6177,8 @@ var QUESTOES = [
 // src/shared/texto.ts
 var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
-// server/gerentes.ts
-var REGRAS_GERENTES = [
+// src/shared/coordenadores.ts
+var REGRAS_COORDENADORES = [
   { gerencia: "GOMAN", bases: ["BCB", "STI", "ITM"], gerente: "LUIS C." },
   { gerencia: "GOMAN", bases: ["PDS"], gerente: "THIAGO F." },
   { gerencia: "GOMAN", bases: ["PDT"], gerente: "RAFAELA" },
@@ -6191,12 +6191,15 @@ var REGRAS_GERENTES = [
   { gerencia: "FROTA", gerente: "RUAN" },
   { gerencia: "SESMT", gerente: "DANIEL" }
 ];
+var COORDENADORES = [...new Set(REGRAS_COORDENADORES.map((r) => r.gerente))];
 function gerenteDe(gerencia, base) {
-  const r = REGRAS_GERENTES.find((x) => x.gerencia === gerencia && (!x.bases || x.bases.includes(base)));
+  const r = REGRAS_COORDENADORES.find((x) => x.gerencia === gerencia && (!x.bases || x.bases.includes(base)));
   return r?.gerente ?? "";
 }
+
+// server/gerentes.ts
 async function aplicarRegraGerentes(somenteVazios) {
-  const linhas = REGRAS_GERENTES.flatMap((r) => (r.bases ?? ["*"]).map((b) => ({ gerencia: r.gerencia, base: b, gerente: r.gerente })));
+  const linhas = REGRAS_COORDENADORES.flatMap((r) => (r.bases ?? ["*"]).map((b) => ({ gerencia: r.gerencia, base: b, gerente: r.gerente })));
   const rs = await sql`
     UPDATE colaboradores AS c SET gerente = r.gerente
     FROM unnest(${linhas.map((l) => l.gerencia)}::text[], ${linhas.map((l) => l.base)}::text[], ${linhas.map((l) => l.gerente)}::text[]) AS r(gerencia, base, gerente)
@@ -6449,6 +6452,7 @@ async function finalizar(req) {
 }
 async function registros() {
   const linhas = await sql`SELECT * FROM tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`;
+  const cadastro = new Map((await sql`SELECT nome_norm, gerente FROM colaboradores`).map((c) => [c.nome_norm, c.gerente ?? ""]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]");
     const { acertos, nota } = corrigir(respostas);
@@ -6466,6 +6470,7 @@ async function registros() {
       nota,
       aprovado: nota >= NOTA_MINIMA,
       horas: HORAS_POR_PARTICIPACAO,
+      coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
       temFoto: l.tem_foto,
       local: l.local
     };
