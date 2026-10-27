@@ -53,17 +53,17 @@ export function PaginaEscola({ regs }: { regs: Registro[] }) {
 
   return (
     <div className="grade-painel">
-      <Cartao titulo="Participantes por Mês"><Colunas dados={meses} /></Cartao>
-      <Cartao titulo="Participantes por Base"><Colunas dados={bases} /></Cartao>
-      <Cartao titulo="Participantes por Gerência"><Colunas dados={gerencias} /></Cartao>
-      <Cartao titulo="Participação na Escola de Segurança" className="alta">
-        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.qtd }))} max={Math.max(...pessoas.map((p) => p.qtd), 1)} destaque={(v) => (v > 1 ? COR.vermelho : COR.verde)} />
+      <Cartao titulo="Participantes por Mês" tabela={meses}><Colunas dados={meses} /></Cartao>
+      <Cartao titulo="Participantes por Base" tabela={bases}><Colunas dados={bases} /></Cartao>
+      <Cartao titulo="Participantes por Gerência" tabela={gerencias}><Colunas dados={gerencias} /></Cartao>
+      <Cartao titulo="Participação na Escola de Segurança" tabela={pessoas.map((x) => ({ nome: x.nome, valor: x.qtd }))} className="alta">
+        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.qtd }))} max={Math.max(...pessoas.map((p) => p.qtd), 1)} destaque={(v) => (v > 1 ? COR.serie : COR.neutro)} />
       </Cartao>
-      <Cartao titulo="Horas por Mês"><Linhas dados={meses} chave="horas" /></Cartao>
-      <Cartao titulo="Reincidência por Base"><Rosca dados={reincPor("base")} /></Cartao>
-      <Cartao titulo="Reincidência por Gerência"><Rosca dados={reincPor("gerencia")} /></Cartao>
-      <Cartao titulo="Participantes por Coordenador" className="larga"><Colunas dados={coordenadores} /></Cartao>
-      <Cartao titulo="Reincidência por Coordenador"><Rosca dados={reincPor("coordenador")} /></Cartao>
+      <Cartao titulo="Horas por Mês" tabela={meses}><Linhas dados={meses} chave="horas" /></Cartao>
+      <Cartao titulo="Reincidência por Base" tabela={reincPor("base")}><Rosca dados={reincPor("base")} /></Cartao>
+      <Cartao titulo="Reincidência por Gerência" tabela={reincPor("gerencia")}><Rosca dados={reincPor("gerencia")} /></Cartao>
+      <Cartao titulo="Participantes por Coordenador" tabela={coordenadores} className="larga"><Colunas dados={coordenadores} /></Cartao>
+      <Cartao titulo="Reincidência por Coordenador" tabela={reincPor("coordenador")}><Rosca dados={reincPor("coordenador")} /></Cartao>
     </div>
   );
 }
@@ -83,17 +83,17 @@ export function PaginaAvaliacao({ regs }: { regs: Registro[] }) {
 
   return (
     <div className="grade-painel">
-      <Cartao titulo="Avaliação por Mês"><ColunasDuplas dados={meses} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Base"><ColunasDuplas dados={bases} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Gerência"><ColunasDuplas dados={gerencias} /></Cartao>
-      <Cartao titulo="Média de Avaliação" className="alta">
+      <Cartao titulo="Avaliação por Mês" tabela={meses}><ColunasDuplas dados={meses} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Base" tabela={bases}><ColunasDuplas dados={bases} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Gerência" tabela={gerencias}><ColunasDuplas dados={gerencias} /></Cartao>
+      <Cartao titulo="Média de Avaliação" tabela={pessoas.map((x) => ({ nome: x.nome, valor: x.media }))} className="alta">
         <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.media }))} max={10} formato={(n) => fmt(n)} destaque={(v) => (v >= NOTA_MINIMA ? COR.verde : COR.vermelho)} />
       </Cartao>
-      <Cartao titulo="% de Reprovados"><Rosca dados={reprovPorGer} /></Cartao>
-      <Cartao titulo="Avaliação por Base"><Colunas dados={mediaBase} formato={(n) => fmt(n)} max={10} /></Cartao>
-      <Cartao titulo="Avaliação por Gerência"><Colunas dados={mediaGer} formato={(n) => fmt(n)} max={10} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Coordenador" className="larga"><ColunasDuplas dados={coords} /></Cartao>
-      <Cartao titulo="Avaliação por Coordenador"><Colunas dados={mediaCoord} formato={(n) => fmt(n)} max={10} /></Cartao>
+      <Cartao titulo="% de Reprovados" tabela={reprovPorGer}><Rosca dados={reprovPorGer} /></Cartao>
+      <Cartao titulo="Avaliação por Base" tabela={mediaBase}><Colunas dados={mediaBase} formato={(n) => fmt(n)} max={10} /></Cartao>
+      <Cartao titulo="Avaliação por Gerência" tabela={mediaGer}><Colunas dados={mediaGer} formato={(n) => fmt(n)} max={10} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Coordenador" tabela={coords} className="larga"><ColunasDuplas dados={coords} /></Cartao>
+      <Cartao titulo="Avaliação por Coordenador" tabela={mediaCoord}><Colunas dados={mediaCoord} formato={(n) => fmt(n)} max={10} /></Cartao>
     </div>
   );
 }
