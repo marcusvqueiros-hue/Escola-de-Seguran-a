@@ -434,7 +434,7 @@ em { font-style: normal; color: var(--vinho); }
   .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .kpi strong { font-size: 30px; }
 }
-.recharts-pie-label-text { fill: var(--texto); font-size: 11px; font-weight: 700; }
+.rosca-valor { fill: #fff; font-size: 13px; font-weight: 800; paint-order: stroke; stroke: rgba(0, 0, 0, 0.25); stroke-width: 2px; }
 
 
 /* fundo: rede neural animada */

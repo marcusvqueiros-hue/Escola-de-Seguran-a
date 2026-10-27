@@ -104,23 +104,33 @@ export function Rosca({ dados, cores = PALETA }: { dados: { nome: string; valor:
   const { tooltip } = usePaleta();
   const total = dados.reduce((a, d) => a + d.valor, 0);
   if (!total) return <Vazio />;
+  const pct = (v: number) => Math.round((v / total) * 100);
+  const RAD = Math.PI / 180;
+  // valor dentro do anel (nunca é cortado); o nome completo e o percentual ficam na legenda
+  const rotuloAnel = (p: any) => {
+    if (p.value / total < 0.06) return null;
+    const r = (p.innerRadius + p.outerRadius) / 2;
+    return (
+      <text x={p.cx + r * Math.cos(-p.midAngle * RAD)} y={p.cy + r * Math.sin(-p.midAngle * RAD)} textAnchor="middle" dominantBaseline="central" className="rosca-valor">
+        {p.value}
+      </text>
+    );
+  };
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={{ top: 16, right: 44, bottom: 8, left: 44 }}>
-        <Tooltip contentStyle={tooltip.contentStyle} />
-        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} verticalAlign="bottom" />
-        <Pie
-          data={dados}
-          dataKey="valor"
-          nameKey="nome"
-          innerRadius="52%"
-          outerRadius="74%"
-          paddingAngle={dados.length > 1 ? 2 : 0}
-          stroke="none"
-          label={(p: any) => `${p.name} ${p.value} (${Math.round((p.value / total) * 100)}%)`}
-          labelLine
-                    animationDuration={800}
-        >
+      <PieChart margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+        <Tooltip contentStyle={tooltip.contentStyle} itemStyle={tooltip.itemStyle} formatter={(v: any, n: any) => [`${v} (${pct(Number(v))}%)`, n]} />
+        <Legend
+          iconType="circle"
+          iconSize={8}
+          verticalAlign="bottom"
+          wrapperStyle={{ fontSize: 12, lineHeight: "18px" }}
+          formatter={(nome: string) => {
+            const d = dados.find((x) => x.nome === nome);
+            return d ? `${nome} · ${d.valor} (${pct(d.valor)}%)` : nome;
+          }}
+        />
+        <Pie data={dados} dataKey="valor" nameKey="nome" innerRadius="50%" outerRadius="86%" paddingAngle={dados.length > 1 ? 2 : 0} stroke="none" label={rotuloAnel} labelLine={false} animationDuration={800}>
           {dados.map((_, i) => (
             <Cell key={i} fill={cores[i % cores.length]} />
           ))}
