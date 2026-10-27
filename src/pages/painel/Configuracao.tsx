@@ -124,6 +124,17 @@ export default function Configuracao() {
     await carregar();
   }
 
+  async function aplicarRegra() {
+    if (!window.confirm("Redefinir o gerente de TODOS os colaboradores pela regra de gerência e base? Ajustes manuais de gerente serão substituídos.")) return;
+    try {
+      const d = await chamar("/api/admin/colaboradores/gerentes", "POST", { somenteVazios: false });
+      setAviso(`Regra aplicada: ${d.alterados} colaborador(es) atualizados.`);
+      await carregar();
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+  }
+
   async function exportar() {
     const XLSX = await import("xlsx");
     const linhas = filtrados.map((c) => ({ CHAPA: c.chapa, NOME: c.nome, "FUNÇÃO": c.funcao, BASE: c.base, GERENCIA: c.gerencia, GERENTE: c.gerente, "SITUAÇÃO": c.situacao }));
@@ -237,6 +248,7 @@ export default function Configuracao() {
             ⇪ Importar planilha
             <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => { const a = e.target.files?.[0]; e.target.value = ""; if (a) escolherArquivo(a); }} />
           </label>
+          <button className="btn-mini sec" onClick={aplicarRegra} title="Atribui o gerente de cada um pela gerência e base">⟳ Regra de gerentes</button>
           <button className="btn-mini sec" onClick={exportar} disabled={!filtrados.length}>⇩ Exportar{filtrando ? " (filtrados)" : ""}</button>
           <button className="btn-mini" onClick={() => setModal({ tipo: "form", dados: { ...VAZIO } })}>＋ Novo colaborador</button>
         </div>

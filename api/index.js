@@ -6177,6 +6177,35 @@ var QUESTOES = [
 // src/shared/texto.ts
 var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
+// server/gerentes.ts
+var REGRAS_GERENTES = [
+  { gerencia: "GOMAN", bases: ["BCB", "STI", "ITM"], gerente: "LUIS C." },
+  { gerencia: "GOMAN", bases: ["PDS"], gerente: "THIAGO F." },
+  { gerencia: "GOMAN", bases: ["PDT"], gerente: "RAFAELA" },
+  { gerencia: "GOMAN", bases: ["BDC"], gerente: "JACKSON" },
+  { gerencia: "GERE", gerente: "ANTONIO M." },
+  { gerencia: "GSTC", bases: ["BCB", "ITM", "STI"], gerente: "AFONSO" },
+  { gerencia: "GSTC", bases: ["PDS", "PDT", "BDC"], gerente: "PAULO" },
+  { gerencia: "ADM", gerente: "PRYSCILLA" },
+  { gerencia: "ALMOXARIFE", gerente: "CAMILA" },
+  { gerencia: "FROTA", gerente: "RUAN" },
+  { gerencia: "SESMT", gerente: "DANIEL" }
+];
+function gerenteDe(gerencia, base) {
+  const r = REGRAS_GERENTES.find((x) => x.gerencia === gerencia && (!x.bases || x.bases.includes(base)));
+  return r?.gerente ?? "";
+}
+async function aplicarRegraGerentes(somenteVazios) {
+  const linhas = REGRAS_GERENTES.flatMap((r) => (r.bases ?? ["*"]).map((b) => ({ gerencia: r.gerencia, base: b, gerente: r.gerente })));
+  const rs = await sql`
+    UPDATE colaboradores AS c SET gerente = r.gerente
+    FROM unnest(${linhas.map((l) => l.gerencia)}::text[], ${linhas.map((l) => l.base)}::text[], ${linhas.map((l) => l.gerente)}::text[]) AS r(gerencia, base, gerente)
+    WHERE c.gerencia = r.gerencia AND (r.base = '*' OR c.base = r.base)
+      AND c.gerente IS DISTINCT FROM r.gerente AND (${!somenteVazios} OR COALESCE(c.gerente, '') = '')
+    RETURNING c.id`;
+  return rs.length;
+}
+
 // server/colaboradores.ts
 var json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 var erro = (msg, status = 400) => json({ erro: msg }, status);
@@ -6236,6 +6265,8 @@ async function importar(b) {
   const porChapa = new Map;
   entrada.forEach((raw, i) => {
     const c = limpar(raw);
+    if (!c.gerente)
+      c.gerente = gerenteDe(c.gerencia, c.base);
     const motivo = validar(c);
     if (motivo)
       return invalidos.push({ linha: i + 2, motivo: `${c.chapa || "?"} ${c.nome || ""}: ${motivo}`.trim() });
@@ -6306,6 +6337,8 @@ async function rotasColaboradores(req, rota) {
     }
     if (req.method === "POST") {
       const c = limpar(await req.json().catch(() => null));
+      if (!c.gerente)
+        c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo)
         return erro(`Dados inválidos: ${motivo}.`);
@@ -6317,12 +6350,18 @@ async function rotasColaboradores(req, rota) {
       return json({ ok: true, id: novo.id }, 201);
     }
   }
+  if (rota === "/api/admin/colaboradores/gerentes" && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    return json({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
+  }
   if (rota === "/api/admin/colaboradores/importar" && req.method === "POST")
     return importar(await req.json().catch(() => null));
   const id = Number(/^\/api\/admin\/colaboradores\/(\d+)$/.exec(rota)?.[1]);
   if (id) {
     if (req.method === "PUT") {
       const c = limpar(await req.json().catch(() => null));
+      if (!c.gerente)
+        c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo)
         return erro(`Dados inválidos: ${motivo}.`);

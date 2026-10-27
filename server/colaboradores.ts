@@ -1,6 +1,7 @@
 import { sql } from "./db";
 import { BASES, GERENCIAS } from "../src/shared/constantes";
 import { chaveNome } from "../src/shared/texto";
+import { aplicarRegraGerentes, gerenteDe } from "./gerentes";
 
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const erro = (msg: string, status = 400) => json({ erro: msg }, status);
@@ -72,6 +73,7 @@ async function importar(b: any) {
   const porChapa = new Map<string, Colab>();
   entrada.forEach((raw, i) => {
     const c = limpar(raw);
+    if (!c.gerente) c.gerente = gerenteDe(c.gerencia, c.base);
     const motivo = validar(c);
     if (motivo) return invalidos.push({ linha: i + 2, motivo: `${c.chapa || "?"} ${c.nome || ""}: ${motivo}`.trim() });
     if (!porChapa.has(c.chapa)) porChapa.set(c.chapa, c); // várias linhas da mesma chapa (vários processos) valem uma só
@@ -145,6 +147,7 @@ export async function rotasColaboradores(req: Request, rota: string): Promise<Re
     }
     if (req.method === "POST") {
       const c = limpar(await req.json().catch(() => null));
+      if (!c.gerente) c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo) return erro(`Dados inválidos: ${motivo}.`);
       const [dup] = (await sql`SELECT 1 FROM colaboradores WHERE matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)}`) as unknown[];
@@ -154,12 +157,17 @@ export async function rotasColaboradores(req: Request, rota: string): Promise<Re
       return json({ ok: true, id: novo!.id }, 201);
     }
   }
+  if (rota === "/api/admin/colaboradores/gerentes" && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    return json({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
+  }
   if (rota === "/api/admin/colaboradores/importar" && req.method === "POST") return importar(await req.json().catch(() => null));
 
   const id = Number(/^\/api\/admin\/colaboradores\/(\d+)$/.exec(rota)?.[1]);
   if (id) {
     if (req.method === "PUT") {
       const c = limpar(await req.json().catch(() => null));
+      if (!c.gerente) c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo) return erro(`Dados inválidos: ${motivo}.`);
       const [dup] = (await sql`SELECT 1 FROM colaboradores WHERE id <> ${id} AND (matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)})`) as unknown[];
