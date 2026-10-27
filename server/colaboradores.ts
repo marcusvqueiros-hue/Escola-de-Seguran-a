@@ -57,7 +57,7 @@ const CAMPOS: [keyof Colab, string][] = [
   ["funcao", "função"],
   ["base", "base"],
   ["gerencia", "gerência"],
-  ["gerente", "gerente"],
+  ["gerente", "coordenador"],
   ["situacao", "situação"],
 ];
 

@@ -6249,7 +6249,7 @@ var CAMPOS = [
   ["funcao", "função"],
   ["base", "base"],
   ["gerencia", "gerência"],
-  ["gerente", "gerente"],
+  ["gerente", "coordenador"],
   ["situacao", "situação"]
 ];
 async function importar(b) {

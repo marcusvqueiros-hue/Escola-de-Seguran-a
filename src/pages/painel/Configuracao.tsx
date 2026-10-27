@@ -30,7 +30,7 @@ type Modal =
 const VAZIO: Colab = { chapa: "", nome: "", funcao: "", base: "", gerencia: "", gerente: "", situacao: "ATIVO" };
 const POR_PAGINA = 50;
 const SITUACOES = ["ATIVO", "FÉRIAS", "AFASTADO"];
-const COLUNAS_XLSX = ["CHAPA", "NOME", "FUNÇÃO", "BASE", "GERENCIA", "GERENTE", "SITUAÇÃO"];
+const COLUNAS_XLSX = ["CHAPA", "NOME", "FUNÇÃO", "BASE", "GERENCIA", "COORDENADOR", "SITUAÇÃO"];
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -125,7 +125,7 @@ export default function Configuracao() {
   }
 
   async function aplicarRegra() {
-    if (!window.confirm("Redefinir o gerente de TODOS os colaboradores pela regra de gerência e base? Ajustes manuais de gerente serão substituídos.")) return;
+    if (!window.confirm("Redefinir o coordenador de TODOS os colaboradores pela regra de gerência e base? Ajustes manuais de coordenador serão substituídos.")) return;
     try {
       const d = await chamar("/api/admin/colaboradores/gerentes", "POST", { somenteVazios: false });
       setAviso(`Regra aplicada: ${d.alterados} colaborador(es) atualizados.`);
@@ -137,7 +137,7 @@ export default function Configuracao() {
 
   async function exportar() {
     const XLSX = await import("xlsx");
-    const linhas = filtrados.map((c) => ({ CHAPA: c.chapa, NOME: c.nome, "FUNÇÃO": c.funcao, BASE: c.base, GERENCIA: c.gerencia, GERENTE: c.gerente, "SITUAÇÃO": c.situacao }));
+    const linhas = filtrados.map((c) => ({ CHAPA: c.chapa, NOME: c.nome, "FUNÇÃO": c.funcao, BASE: c.base, GERENCIA: c.gerencia, COORDENADOR: c.gerente, "SITUAÇÃO": c.situacao }));
     const ws = XLSX.utils.json_to_sheet(linhas, { header: COLUNAS_XLSX });
     ws["!cols"] = [{ wch: 9 }, { wch: 42 }, { wch: 38 }, { wch: 7 }, { wch: 12 }, { wch: 28 }, { wch: 11 }];
     const wb = XLSX.utils.book_new();
@@ -152,7 +152,7 @@ export default function Configuracao() {
       const wb = XLSX.read(await arq.arrayBuffer());
       const ws = wb.Sheets["Base"] ?? wb.Sheets[wb.SheetNames[0]!]!;
       const brutas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-      const mapa: Record<string, string> = { CHAPA: "chapa", NOME: "nome", FUNCAO: "funcao", BASE: "base", GERENCIA: "gerencia", GERENTE: "gerente", SITUACAO: "situacao" };
+      const mapa: Record<string, string> = { CHAPA: "chapa", NOME: "nome", FUNCAO: "funcao", BASE: "base", GERENCIA: "gerencia", GERENTE: "gerente", COORDENADOR: "gerente", SITUACAO: "situacao" };
       const linhas = brutas.map((r) => {
         const o: Record<string, string> = {};
         for (const [k, v] of Object.entries(r)) {
@@ -164,7 +164,7 @@ export default function Configuracao() {
       const cabecalhos = new Set(Object.keys(brutas[0] ?? {}).map(norm));
       const faltam = ["CHAPA", "NOME", "FUNCAO", "BASE", "GERENCIA"].filter((c) => !cabecalhos.has(c));
       if (faltam.length) throw new Error(`A planilha precisa das colunas: ${faltam.join(", ")} (aba "Base" ou primeira aba).`);
-      const temGerente = cabecalhos.has("GERENTE");
+      const temGerente = cabecalhos.has("COORDENADOR") || cabecalhos.has("GERENTE");
       const previa = (await chamar("/api/admin/colaboradores/importar", "POST", { linhas, temGerente, aplicar: false })) as Previa;
       setModal({ tipo: "importar", arquivo: arq.name, linhas: linhas as never, temGerente, previa, remover: true, aplicando: false });
     } catch (e) {
@@ -197,7 +197,7 @@ export default function Configuracao() {
         <div className="kpi" style={{ ["--cor" as string]: "#84162b" }}><span>Colaboradores</span><strong>{lista.length}</strong></div>
         <div className="kpi" style={{ ["--cor" as string]: "#137e6a" }}><span>Ativos</span><strong>{ativos}</strong></div>
         <div className="kpi" style={{ ["--cor" as string]: "#e0a526" }}><span>Férias / afastados</span><strong>{lista.length - ativos}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "#1e90ff" }}><span>Gerentes cadastrados</span><strong>{gerentes.length}</strong></div>
+        <div className="kpi" style={{ ["--cor" as string]: "#1e90ff" }}><span>Coordenadores cadastrados</span><strong>{gerentes.length}</strong></div>
       </div>
 
       <div className="resumo-grupos">
@@ -230,8 +230,8 @@ export default function Configuracao() {
             <option value="">Todas as gerências</option>
             {gerencias.map((g) => <option key={g}>{g}</option>)}
           </select>
-          <select value={fGerente} onChange={(e) => setFGerente(e.target.value)} aria-label="Gerente">
-            <option value="">{gerentes.length ? "Todos os gerentes" : "Gerente (nenhum cadastrado)"}</option>
+          <select value={fGerente} onChange={(e) => setFGerente(e.target.value)} aria-label="Coordenador">
+            <option value="">{gerentes.length ? "Todos os coordenadores" : "Coordenador (nenhum cadastrado)"}</option>
             {gerentes.map(([g, n]) => <option key={g} value={g}>{g} ({n})</option>)}
           </select>
           <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)} aria-label="Situação">
@@ -248,7 +248,7 @@ export default function Configuracao() {
             ⇪ Importar planilha
             <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => { const a = e.target.files?.[0]; e.target.value = ""; if (a) escolherArquivo(a); }} />
           </label>
-          <button className="btn-mini sec" onClick={aplicarRegra} title="Atribui o gerente de cada um pela gerência e base">⟳ Regra de gerentes</button>
+          <button className="btn-mini sec" onClick={aplicarRegra} title="Atribui o coordenador de cada um pela gerência e base">⟳ Regra de coordenadores</button>
           <button className="btn-mini sec" onClick={exportar} disabled={!filtrados.length}>⇩ Exportar{filtrando ? " (filtrados)" : ""}</button>
           <button className="btn-mini" onClick={() => setModal({ tipo: "form", dados: { ...VAZIO } })}>＋ Novo colaborador</button>
         </div>
@@ -256,7 +256,7 @@ export default function Configuracao() {
         <div className="tabela-wrap">
           <table className="tabela">
             <thead>
-              <tr><th>Chapa</th><th>Nome</th><th>Função</th><th>Base</th><th>Gerência</th><th>Gerente</th><th>Situação</th><th aria-label="Ações" /></tr>
+              <tr><th>Chapa</th><th>Nome</th><th>Função</th><th>Base</th><th>Gerência</th><th>Coordenador</th><th>Situação</th><th aria-label="Ações" /></tr>
             </thead>
             <tbody>
               {visiveis.map((c) => (
@@ -266,7 +266,7 @@ export default function Configuracao() {
                   <td data-rotulo="Função">{c.funcao}</td>
                   <td data-rotulo="Base">{c.base}</td>
                   <td data-rotulo="Gerência">{c.gerencia}</td>
-                  <td data-rotulo="Gerente">{c.gerente || "—"}</td>
+                  <td data-rotulo="Coordenador">{c.gerente || "—"}</td>
                   <td data-rotulo="Situação"><span className={`selo-sit ${c.situacao === "ATIVO" ? "ok" : ""}`}>{c.situacao}</span></td>
                   <td className="acoes-linha">
                     <button title="Editar" aria-label={`Editar ${c.nome}`} onClick={() => setModal({ tipo: "form", dados: { ...c } })}>✎</button>
@@ -307,7 +307,7 @@ export default function Configuracao() {
             <div><b>{modal.previa.resumo.semMudanca}</b><span>sem mudança</span></div>
             <div className={modal.previa.resumo.invalidos ? "perigo" : ""}><b>{modal.previa.resumo.invalidos}</b><span>com problema</span></div>
           </div>
-          {!modal.temGerente && <p className="dica vis">A planilha não tem a coluna GERENTE; os gerentes já cadastrados serão mantidos.</p>}
+          {!modal.temGerente && <p className="dica vis">A planilha não tem a coluna COORDENADOR; os coordenadores já cadastrados serão mantidos.</p>}
 
           <label className="check">
             <input type="checkbox" checked={modal.remover} onChange={(e) => setModal({ ...modal, remover: e.target.checked })} />
@@ -434,7 +434,7 @@ function FormColab({ inicial, bases, gerencias, funcoes, gerentes, onSalvar, onF
           </label>
         </div>
         <label className="campo">
-          <span>Gerente (opcional)</span>
+          <span>Coordenador (opcional)</span>
           <input list="lista-gerentes" value={c.gerente} onChange={(e) => set({ gerente: e.target.value.toUpperCase() })} />
           <datalist id="lista-gerentes">{gerentes.map((g) => <option key={g} value={g} />)}</datalist>
         </label>
