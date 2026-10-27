@@ -5,12 +5,14 @@ import { TemaBotao } from "../../lib/tema";
 import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
 import { PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
+import Configuracao from "./Configuracao";
 import { anosDisponiveis, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
   { id: "avaliacao", rotulo: "Avaliação" },
   { id: "detalhamento", rotulo: "Detalhamento" },
+  { id: "configuracao", rotulo: "Configuração" },
 ] as const;
 type Aba = (typeof ABAS)[number]["id"];
 
@@ -74,8 +76,8 @@ export default function Painel() {
         <div className="marca">
           <Logo tamanho={44} neon tom="sobreVinho" />
           <div>
-            <h1>{ABAS.find((a) => a.id === aba)!.rotulo}</h1>
-            <small>Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>
+            <h1>Escola de Segurança</h1>
+            <small>{ABAS.find((a) => a.id === aba)!.rotulo} · Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>
           </div>
         </div>
         <nav className="abas" role="tablist">
@@ -93,6 +95,7 @@ export default function Painel() {
         </div>
       </header>
 
+      {aba !== "configuracao" && (
       <section className="filtros">
         <button className="filtros-toggle" onClick={() => setFiltrosAbertos((a) => !a)} aria-expanded={filtrosAbertos}>
           <span>Filtros{ativo ? " • ativos" : ""}</span>
@@ -124,6 +127,7 @@ export default function Painel() {
         <button className="limpar" disabled={!ativo} onClick={() => setFiltro({ ...semFiltro })}>Limpar filtros</button>
         </div>
       </section>
+      )}
 
       {erro && <p className="erro-msg centro">{erro}</p>}
 
@@ -131,6 +135,7 @@ export default function Painel() {
         {aba === "escola" && <PaginaEscola regs={filtrados} />}
         {aba === "avaliacao" && <PaginaAvaliacao regs={filtrados} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} />}
+        {aba === "configuracao" && <Configuracao />}
       </div>
       <Rodape />
     </main>

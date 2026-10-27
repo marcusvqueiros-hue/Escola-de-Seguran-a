@@ -47,6 +47,8 @@ export function iniciarBanco() {
         situacao  TEXT
       )`;
     await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS gerente TEXT`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS colaboradores_matricula_uq ON colaboradores (matricula)`;
 
     const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM tentativas WHERE origem = 'importado'`) as { n: number }[];
     if (n === 0) {

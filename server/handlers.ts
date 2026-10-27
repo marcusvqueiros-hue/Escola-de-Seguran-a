@@ -14,6 +14,7 @@ import {
 } from "../src/shared/constantes";
 import { QUESTOES } from "../src/shared/questoes";
 import { chaveNome } from "../src/shared/texto";
+import { rotasColaboradores } from "./colaboradores";
 
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -77,9 +78,7 @@ async function finalizar(req: Request) {
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`,
   ]);
 
-  await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
-            ON CONFLICT (nome_norm) DO UPDATE SET prefixo = EXCLUDED.prefixo`;
+  await sql`UPDATE colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
 
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
@@ -148,6 +147,8 @@ export async function api(req: Request): Promise<Response> {
 
     if (rota.startsWith("/api/admin/")) {
       if (!autenticado(req)) return erro("Não autorizado.", 401);
+      const colab = await rotasColaboradores(req, rota);
+      if (colab) return colab;
       if (rota === "/api/admin/registros") return json({ registros: await registros(), notaMinima: NOTA_MINIMA });
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {

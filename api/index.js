@@ -6045,6 +6045,8 @@ function iniciarBanco() {
         situacao  TEXT
       )`;
     await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS gerente TEXT`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS colaboradores_matricula_uq ON colaboradores (matricula)`;
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM tentativas WHERE origem = 'importado'`;
     if (n === 0) {
       await sql.transaction(seed_default.map((r, i) => sql`
@@ -6175,16 +6177,180 @@ var QUESTOES = [
 // src/shared/texto.ts
 var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
-// server/handlers.ts
-var json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
+// server/colaboradores.ts
+var json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 var erro = (msg, status = 400) => json({ erro: msg }, status);
+var txt = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+function limpar(b) {
+  return {
+    chapa: txt(b?.chapa, 20),
+    nome: txt(b?.nome, 100).toUpperCase(),
+    funcao: txt(b?.funcao, 100).toUpperCase(),
+    base: txt(b?.base, 20).toUpperCase(),
+    gerencia: txt(b?.gerencia, 30).toUpperCase(),
+    gerente: txt(b?.gerente, 100).toUpperCase(),
+    situacao: txt(b?.situacao, 20).toUpperCase() || "ATIVO"
+  };
+}
+function validar(c) {
+  if (!/^[A-Za-z0-9._-]{1,20}$/.test(c.chapa))
+    return "chapa ausente ou inválida";
+  if (c.nome.split(" ").length < 2)
+    return "nome incompleto";
+  if (!c.funcao)
+    return "função ausente";
+  if (!BASES.includes(c.base))
+    return `base "${c.base || "—"}" não cadastrada`;
+  if (!GERENCIAS.includes(c.gerencia))
+    return `gerência "${c.gerencia || "—"}" não cadastrada`;
+  return null;
+}
+var linha = (l) => ({
+  id: l.id,
+  chapa: l.matricula,
+  nome: l.nome,
+  funcao: l.funcao ?? "",
+  base: l.base ?? "",
+  gerencia: l.gerencia ?? "",
+  gerente: l.gerente ?? "",
+  situacao: l.situacao ?? "ATIVO"
+});
+var CAMPOS = [
+  ["nome", "nome"],
+  ["funcao", "função"],
+  ["base", "base"],
+  ["gerencia", "gerência"],
+  ["gerente", "gerente"],
+  ["situacao", "situação"]
+];
+async function importar(b) {
+  const entrada = Array.isArray(b?.linhas) ? b.linhas : [];
+  if (!entrada.length)
+    return erro("A planilha não tem linhas para importar.");
+  if (entrada.length > 5000)
+    return erro("Planilha grande demais (máximo de 5.000 linhas).");
+  const temGerente = !!b.temGerente;
+  const aplicar = !!b.aplicar;
+  const remover = !!b.remover;
+  const invalidos = [];
+  const porChapa = new Map;
+  entrada.forEach((raw, i) => {
+    const c = limpar(raw);
+    const motivo = validar(c);
+    if (motivo)
+      return invalidos.push({ linha: i + 2, motivo: `${c.chapa || "?"} ${c.nome || ""}: ${motivo}`.trim() });
+    if (!porChapa.has(c.chapa))
+      porChapa.set(c.chapa, c);
+  });
+  const novoSet = [...porChapa.values()];
+  const atuais = (await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM colaboradores`).map(linha);
+  const atualPorChapa = new Map(atuais.map((c) => [c.chapa, c]));
+  const novos = [];
+  const alterados = [];
+  const nomesUsados = new Map(atuais.map((c) => [chaveNome(c.nome), c.chapa]));
+  const chapasNovoSet = new Set(novoSet.map((c) => c.chapa));
+  const vistosNome = new Set;
+  for (const c of novoSet) {
+    const norm = chaveNome(c.nome);
+    const dono = nomesUsados.get(norm);
+    if (dono && dono !== c.chapa && chapasNovoSet.has(dono) === false || vistosNome.has(norm)) {
+      invalidos.push({ linha: 0, motivo: `${c.chapa} ${c.nome}: nome já cadastrado com outra chapa` });
+      continue;
+    }
+    vistosNome.add(norm);
+    const atual = atualPorChapa.get(c.chapa);
+    if (!atual) {
+      novos.push(c);
+      continue;
+    }
+    const mudancas = CAMPOS.filter(([k]) => (k !== "gerente" || temGerente) && c[k] !== atual[k]).map(([k, rot]) => `${rot}: ${atual[k] || "—"} → ${c[k] || "—"}`);
+    if (mudancas.length)
+      alterados.push({ c, id: atual.id, mudancas });
+  }
+  const presentes = new Set(entrada.map((r) => txt(r?.chapa, 20)));
+  const removidos = atuais.filter((c) => !presentes.has(c.chapa));
+  if (aplicar) {
+    const ops = [];
+    if (novos.length)
+      ops.push(sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
+        SELECT * FROM unnest(${novos.map((c) => c.nome)}::text[], ${novos.map((c) => chaveNome(c.nome))}::text[], ${novos.map((c) => c.chapa)}::text[],
+          ${novos.map(() => "")}::text[], ${novos.map((c) => c.funcao)}::text[], ${novos.map((c) => c.base)}::text[],
+          ${novos.map((c) => c.gerencia)}::text[], ${novos.map((c) => c.gerente)}::text[], ${novos.map((c) => c.situacao)}::text[])`);
+    if (alterados.length)
+      ops.push(sql`UPDATE colaboradores AS t SET nome = v.nome, nome_norm = v.norm, funcao = v.funcao, base = v.base, gerencia = v.gerencia,
+          gerente = CASE WHEN ${temGerente} THEN v.gerente ELSE t.gerente END, situacao = v.situacao
+        FROM (SELECT * FROM unnest(${alterados.map((a) => a.id)}::int[], ${alterados.map((a) => a.c.nome)}::text[], ${alterados.map((a) => chaveNome(a.c.nome))}::text[],
+          ${alterados.map((a) => a.c.funcao)}::text[], ${alterados.map((a) => a.c.base)}::text[], ${alterados.map((a) => a.c.gerencia)}::text[],
+          ${alterados.map((a) => a.c.gerente)}::text[], ${alterados.map((a) => a.c.situacao)}::text[]) AS x(id, nome, norm, funcao, base, gerencia, gerente, situacao)) AS v
+        WHERE t.id = v.id`);
+    if (remover && removidos.length)
+      ops.push(sql`DELETE FROM colaboradores WHERE id = ANY(${removidos.map((c) => c.id)}::int[])`);
+    if (ops.length)
+      await sql.transaction(ops);
+  }
+  const amostra = (xs) => xs.slice(0, 60);
+  return json({
+    aplicado: aplicar,
+    resumo: { lidos: entrada.length, novos: novos.length, alterados: alterados.length, removidos: removidos.length, invalidos: invalidos.length, semMudanca: novoSet.length - novos.length - alterados.length },
+    novos: amostra(novos.map((c) => ({ chapa: c.chapa, nome: c.nome, base: c.base, gerencia: c.gerencia }))),
+    alterados: amostra(alterados.map((a) => ({ chapa: a.c.chapa, nome: a.c.nome, mudancas: a.mudancas }))),
+    removidos: amostra(removidos.map((c) => ({ chapa: c.chapa, nome: c.nome, base: c.base, gerencia: c.gerencia }))),
+    invalidos: amostra(invalidos)
+  });
+}
+async function rotasColaboradores(req, rota) {
+  if (rota === "/api/admin/colaboradores") {
+    if (req.method === "GET") {
+      const rs = await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM colaboradores ORDER BY nome_norm`;
+      return json({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
+    }
+    if (req.method === "POST") {
+      const c = limpar(await req.json().catch(() => null));
+      const motivo = validar(c);
+      if (motivo)
+        return erro(`Dados inválidos: ${motivo}.`);
+      const [dup] = await sql`SELECT 1 FROM colaboradores WHERE matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)}`;
+      if (dup)
+        return erro("Já existe colaborador com essa chapa ou esse nome.", 409);
+      const [novo] = await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
+        VALUES (${c.nome}, ${chaveNome(c.nome)}, ${c.chapa}, '', ${c.funcao}, ${c.base}, ${c.gerencia}, ${c.gerente}, ${c.situacao}) RETURNING id`;
+      return json({ ok: true, id: novo.id }, 201);
+    }
+  }
+  if (rota === "/api/admin/colaboradores/importar" && req.method === "POST")
+    return importar(await req.json().catch(() => null));
+  const id = Number(/^\/api\/admin\/colaboradores\/(\d+)$/.exec(rota)?.[1]);
+  if (id) {
+    if (req.method === "PUT") {
+      const c = limpar(await req.json().catch(() => null));
+      const motivo = validar(c);
+      if (motivo)
+        return erro(`Dados inválidos: ${motivo}.`);
+      const [dup] = await sql`SELECT 1 FROM colaboradores WHERE id <> ${id} AND (matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)})`;
+      if (dup)
+        return erro("Outro colaborador já usa essa chapa ou esse nome.", 409);
+      const r = await sql`UPDATE colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
+        base = ${c.base}, gerencia = ${c.gerencia}, gerente = ${c.gerente}, situacao = ${c.situacao} WHERE id = ${id} RETURNING id`;
+      return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
+    }
+    if (req.method === "DELETE") {
+      const r = await sql`DELETE FROM colaboradores WHERE id = ${id} RETURNING id`;
+      return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
+    }
+  }
+  return null;
+}
+
+// server/handlers.ts
+var json2 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
+var erro2 = (msg, status = 400) => json2({ erro: msg }, status);
 var limpa = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 var LETRAS = new Set(["A", "B", "C", "D"]);
 var ipDe = (req) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 async function iniciar(req) {
   const b = await req.json().catch(() => null);
   if (!b)
-    return erro("Requisição inválida.");
+    return erro2("Requisição inválida.");
   const nome = limpa(b.nome, 100).toUpperCase();
   const matricula = limpa(b.matricula, 20);
   const prefixo = limpa(b.prefixo, 30).toUpperCase();
@@ -6192,57 +6358,55 @@ async function iniciar(req) {
   const base = limpa(b.base, 10).toUpperCase();
   const gerencia = limpa(b.gerencia, 10).toUpperCase();
   if (nome.split(" ").length < 2)
-    return erro("Informe o nome completo.");
+    return erro2("Informe o nome completo.");
   if (!matricula || !prefixo || !funcao)
-    return erro("Preencha todos os campos.");
+    return erro2("Preencha todos os campos.");
   if (!BASES.includes(base))
-    return erro("Base inválida.");
+    return erro2("Base inválida.");
   if (!GERENCIAS.includes(gerencia))
-    return erro("Coordenação inválida.");
+    return erro2("Coordenação inválida.");
   const id = randomUUID();
   await sql`INSERT INTO tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia)
             VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia})`;
-  return json({ id, duracaoSeg: DURACAO_SEG });
+  return json2({ id, duracaoSeg: DURACAO_SEG });
 }
 async function finalizar(req) {
   const b = await req.json().catch(() => null);
   if (!b)
-    return erro("Requisição inválida.");
+    return erro2("Requisição inválida.");
   const [t] = await sql`SELECT * FROM tentativas WHERE id = ${limpa(b.id, 60)}`;
   if (!t || t.origem !== "app")
-    return erro("Avaliação não encontrada.", 404);
+    return erro2("Avaliação não encontrada.", 404);
   if (t.finalizada_em)
-    return erro("Esta avaliação já foi finalizada.", 409);
+    return erro2("Esta avaliação já foi finalizada.", 409);
   const agora = Date.now();
   const decorrido = Math.round((agora - Date.parse(t.iniciada_em)) / 1000);
   if (decorrido > DURACAO_SEG + TOLERANCIA_FOTO_SEG)
-    return erro("O tempo da avaliação esgotou. Inicie novamente.", 410);
+    return erro2("O tempo da avaliação esgotou. Inicie novamente.", 410);
   const respostas = QUESTOES.map((_, i) => {
     const r = Array.isArray(b.respostas) ? b.respostas[i] : null;
     return LETRAS.has(r) ? r : null;
   });
   const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.foto ?? ""));
   if (!m)
-    return erro("A foto é obrigatória para finalizar a avaliação.");
+    return erro2("A foto é obrigatória para finalizar a avaliação.");
   const bytes = Buffer.from(m[1], "base64");
   if (bytes.length < 2000 || bytes.length > 3.5 * 1024 * 1024 || bytes[0] !== 255 || bytes[1] !== 216)
-    return erro("Foto inválida.");
+    return erro2("Foto inválida.");
   const local = limpa(b.local, 300);
   const lat = Number(b.lat);
   const lng = Number(b.lng);
   if (!local || !Number.isFinite(lat) || !Number.isFinite(lng))
-    return erro("A localização é obrigatória.");
+    return erro2("A localização é obrigatória.");
   await sql.transaction([
     sql`INSERT INTO fotos (id, dados) VALUES (${t.id}, ${m[1]}) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados`,
     sql`UPDATE tentativas SET finalizada_em = ${new Date(agora).toISOString()}, respostas = ${JSON.stringify(respostas)},
           duracao_seg = ${Math.min(decorrido, DURACAO_SEG)}, tem_foto = TRUE, local = ${local}, lat = ${lat}, lng = ${lng},
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`
   ]);
-  await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
-            ON CONFLICT (nome_norm) DO UPDATE SET prefixo = EXCLUDED.prefixo`;
+  await sql`UPDATE colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
   const { nota } = corrigir(respostas);
-  return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
+  return json2({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
 }
 async function registros() {
   const linhas = await sql`SELECT * FROM tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`;
@@ -6277,18 +6441,18 @@ async function api(req) {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
       const digitos = /^\d+$/.test(q);
       if (q.length < 2)
-        return json({ resultados: [] });
+        return json2({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
       const rs = digitos ? await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8` : await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE nome_norm LIKE ${padrao}
                     ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
-      return json({ resultados: rs });
+      return json2({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
     if (colab && req.method === "GET") {
       const [c] = await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM colaboradores WHERE id = ${Number(colab)}`;
-      return c ? json(c) : erro("Colaborador não encontrado.", 404);
+      return c ? json2(c) : erro2("Colaborador não encontrado.", 404);
     }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST")
       return await iniciar(req);
@@ -6298,30 +6462,33 @@ async function api(req) {
       const b = await req.json().catch(() => ({}));
       const r = await tentarLogin(ipDe(req), String(b.usuario ?? ""), String(b.senha ?? ""));
       if (!r.token)
-        return erro(r.erro ?? "Falha no login.", 401);
-      return json({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
+        return erro2(r.erro ?? "Falha no login.", 401);
+      return json2({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
     }
     if (rota === "/api/admin/logout" && req.method === "POST")
-      return json({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
+      return json2({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
     if (rota === "/api/admin/sessao")
-      return json({ autenticado: autenticado(req) });
+      return json2({ autenticado: autenticado(req) });
     if (rota.startsWith("/api/admin/")) {
       if (!autenticado(req))
-        return erro("Não autorizado.", 401);
+        return erro2("Não autorizado.", 401);
+      const colab = await rotasColaboradores(req, rota);
+      if (colab)
+        return colab;
       if (rota === "/api/admin/registros")
-        return json({ registros: await registros(), notaMinima: NOTA_MINIMA });
+        return json2({ registros: await registros(), notaMinima: NOTA_MINIMA });
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {
         const [f] = await sql`SELECT dados FROM fotos WHERE id = ${id}`;
         if (!f)
-          return erro("Foto não encontrada.", 404);
+          return erro2("Foto não encontrada.", 404);
         return new Response(Buffer.from(f.dados, "base64"), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" } });
       }
     }
-    return erro("Rota não encontrada.", 404);
+    return erro2("Rota não encontrada.", 404);
   } catch (e) {
     console.error(e);
-    return erro("Erro interno. Tente novamente.", 500);
+    return erro2("Erro interno. Tente novamente.", 500);
   }
 }
 
