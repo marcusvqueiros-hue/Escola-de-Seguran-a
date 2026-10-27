@@ -5,6 +5,7 @@ interface Sugestao {
   id: number;
   nome: string;
   base: string;
+  matricula: string;
 }
 
 interface Props {
@@ -117,7 +118,7 @@ export default function NomeCombo({ valor, onChange, onEscolher, onEnter }: Prop
               onMouseEnter={() => setAtivo(i)}
             >
               <span>{destacar(s.nome, valor)}</span>
-              <small>{s.base}</small>
+              <small>{s.base} · {s.matricula}</small>
             </li>
           ))}
         </ul>

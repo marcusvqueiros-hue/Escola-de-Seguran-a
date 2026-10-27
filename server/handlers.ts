@@ -79,8 +79,7 @@ async function finalizar(req: Request) {
 
   await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
             VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
-            ON CONFLICT (nome_norm) DO UPDATE SET matricula = EXCLUDED.matricula, prefixo = EXCLUDED.prefixo,
-              funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia`;
+            ON CONFLICT (nome_norm) DO UPDATE SET prefixo = EXCLUDED.prefixo`;
 
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
@@ -119,12 +118,15 @@ export async function api(req: Request): Promise<Response> {
 
     if (rota === "/api/colaboradores" && req.method === "GET") {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
+      const digitos = /^\d+$/.test(q);
       if (q.length < 2) return json({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
-      const rs = await sql`SELECT id, nome, base FROM colaboradores WHERE nome_norm LIKE ${padrao}
-                            ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
+      const rs = digitos
+        ? await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8`
+        : await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE nome_norm LIKE ${padrao}
+                    ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
       return json({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];

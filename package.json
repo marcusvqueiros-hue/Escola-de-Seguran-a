@@ -7,6 +7,7 @@
     "start": "NODE_ENV=production bun server/index.ts",
     "build": "bun build ./index.html --outdir dist --minify --splitting && node scripts/copiar-public.cjs",
     "build:api": "bun build server/vercel.ts --target=node --format=esm --outfile=api/index.js",
+    "colaboradores": "bun scripts/importar-colaboradores.ts",
     "icones": "bun scripts/gerar-icones.ts",
     "importar": "bun scripts/importar-xlsx.ts",
     "typecheck": "tsc --noEmit"

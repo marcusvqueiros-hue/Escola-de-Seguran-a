@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 import seed from "./seed.json";
-import { chaveNome } from "../src/shared/texto";
 
 const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url) throw new Error("DATABASE_URL não configurada (veja o README).");
@@ -44,8 +43,10 @@ export function iniciarBanco() {
         prefixo   TEXT,
         funcao    TEXT,
         base      TEXT,
-        gerencia  TEXT
+        gerencia  TEXT,
+        situacao  TEXT
       )`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
 
     const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM tentativas WHERE origem = 'importado'`) as { n: number }[];
     if (n === 0) {
@@ -59,20 +60,6 @@ export function iniciarBanco() {
       );
     }
 
-    // Cadastro provisório: um colaborador por nome, com os dados da resposta mais recente.
-    const [{ c }] = (await sql`SELECT COUNT(*)::int AS c FROM colaboradores`) as { c: number }[];
-    if (c === 0) {
-      const ultimo = new Map<string, any>();
-      for (const r of [...(seed as any[])].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))) ultimo.set(chaveNome(r.nome), r);
-      await sql.transaction(
-        [...ultimo].map(
-          ([norm, r]) => sql`
-            INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${r.nome}, ${norm}, ${r.matricula}, ${r.prefixo}, ${r.funcao}, ${r.base}, ${r.gerencia})
-            ON CONFLICT (nome_norm) DO NOTHING`,
-        ),
-      );
-    }
   })().catch((e) => {
     pronto = null;
     throw e;

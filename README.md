@@ -22,7 +22,7 @@ Publicar na Vercel: `bun run build:api` (gera api/index.js), commit e `vercel de
 ## Dados
 
 - Banco Postgres (Neon, via Vercel). Tabelas: `tentativas`, `fotos`, `colaboradores` (cadastro usado no autocompletar do login) e `falhas_login`.
-- O cadastro de colaboradores é provisório: foi montado a partir das respostas do Forms e é atualizado a cada avaliação concluída.
+- O cadastro de colaboradores vem da planilha oficial (aba `Base`): `bun run colaboradores "caminho.xlsx"` substitui o cadastro no banco. O prefixo não existe na planilha; é digitado pelo colaborador e lembrado para a próxima vez.
 - Na primeira execução com o banco vazio, as 45 respostas do Forms são importadas de `server/seed.json`.
   Para reimportar outra planilha: `bun run importar "caminho.xlsx"`, apague `data/` e reinicie.
 - O gabarito fica só no servidor (`server/gabarito.ts`); o navegador nunca recebe as respostas corretas.

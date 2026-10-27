@@ -4,7 +4,7 @@ export const NOTA_MINIMA = 7;
 export const HORAS_POR_PARTICIPACAO = 3;
 
 export const BASES = ["BCB", "BDC", "ITM", "PDS", "PDT", "STI"] as const;
-export const GERENCIAS = ["GERE", "GOMAN", "GSTC", "PERDAS", "QSMS", "SPOT"] as const;
+export const GERENCIAS = ["GERE", "GOMAN", "GSTC", "ADM", "ALMOXARIFE", "FROTA", "SESMT", "PERDAS", "QSMS", "SPOT"] as const;
 export const FUNCOES = [
   "ELETRICISTA",
   "ELETRICISTA MONTADOR",

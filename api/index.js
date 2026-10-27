@@ -6002,9 +6002,6 @@ var seed_default = [
   }
 ];
 
-// src/shared/texto.ts
-var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
-
 // server/db.ts
 var url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url)
@@ -6044,24 +6041,16 @@ function iniciarBanco() {
         prefixo   TEXT,
         funcao    TEXT,
         base      TEXT,
-        gerencia  TEXT
+        gerencia  TEXT,
+        situacao  TEXT
       )`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM tentativas WHERE origem = 'importado'`;
     if (n === 0) {
       await sql.transaction(seed_default.map((r, i) => sql`
             INSERT INTO tentativas (id, iniciada_em, finalizada_em, nome, matricula, prefixo, funcao, base, gerencia, respostas, origem)
             VALUES (${`seed-${i + 1}`}, ${r.criadoEm}, ${r.criadoEm}, ${r.nome}, ${r.matricula}, ${r.prefixo}, ${r.funcao}, ${r.base}, ${r.gerencia}, ${JSON.stringify(r.respostas)}, 'importado')
             ON CONFLICT (id) DO NOTHING`));
-    }
-    const [{ c }] = await sql`SELECT COUNT(*)::int AS c FROM colaboradores`;
-    if (c === 0) {
-      const ultimo = new Map;
-      for (const r of [...seed_default].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)))
-        ultimo.set(chaveNome(r.nome), r);
-      await sql.transaction([...ultimo].map(([norm, r]) => sql`
-            INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${r.nome}, ${norm}, ${r.matricula}, ${r.prefixo}, ${r.funcao}, ${r.base}, ${r.gerencia})
-            ON CONFLICT (nome_norm) DO NOTHING`));
     }
   })().catch((e) => {
     pronto = null;
@@ -6126,7 +6115,7 @@ var TOLERANCIA_FOTO_SEG = 10 * 60;
 var NOTA_MINIMA = 7;
 var HORAS_POR_PARTICIPACAO = 3;
 var BASES = ["BCB", "BDC", "ITM", "PDS", "PDT", "STI"];
-var GERENCIAS = ["GERE", "GOMAN", "GSTC", "PERDAS", "QSMS", "SPOT"];
+var GERENCIAS = ["GERE", "GOMAN", "GSTC", "ADM", "ALMOXARIFE", "FROTA", "SESMT", "PERDAS", "QSMS", "SPOT"];
 
 // src/shared/questoes.ts
 var o = (...t) => t.map((texto, i) => ({ letra: "ABCD"[i], texto }));
@@ -6182,6 +6171,9 @@ var QUESTOES = [
     opcoes: o("Continuar a atividade para não atrasar o serviço.", "Corrigir a situação somente após finalizar a tarefa.", "Interromper a atividade, comunicar a equipe e adotar as medidas de controle necessárias.", "Registrar a condição insegura apenas ao final do expediente.")
   }
 ];
+
+// src/shared/texto.ts
+var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
 // server/handlers.ts
 var json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -6248,8 +6240,7 @@ async function finalizar(req) {
   ]);
   await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia)
             VALUES (${t.nome}, ${chaveNome(t.nome)}, ${t.matricula}, ${t.prefixo}, ${t.funcao}, ${t.base}, ${t.gerencia})
-            ON CONFLICT (nome_norm) DO UPDATE SET matricula = EXCLUDED.matricula, prefixo = EXCLUDED.prefixo,
-              funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia`;
+            ON CONFLICT (nome_norm) DO UPDATE SET prefixo = EXCLUDED.prefixo`;
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
 }
@@ -6284,13 +6275,14 @@ async function api(req) {
     await iniciarBanco();
     if (rota === "/api/colaboradores" && req.method === "GET") {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
+      const digitos = /^\d+$/.test(q);
       if (q.length < 2)
         return json({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
-      const rs = await sql`SELECT id, nome, base FROM colaboradores WHERE nome_norm LIKE ${padrao}
-                            ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
+      const rs = digitos ? await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8` : await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE nome_norm LIKE ${padrao}
+                    ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
       return json({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
