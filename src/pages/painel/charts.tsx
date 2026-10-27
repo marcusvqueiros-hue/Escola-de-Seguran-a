@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTema } from "../../lib/tema";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Legend, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -156,18 +156,13 @@ export function ColunasDuplas({ dados }: { dados: Linha[] }) {
   );
 }
 
-/** Evolução no tempo: linha de 2px com um véu de 10%, marcadores com anel e rótulos só no pico e no último ponto. */
+/** Evolução no tempo: linha de 2px com um véu de 10%, marcadores com anel e o valor em cada ponto (poucos meses). */
 export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: string }) {
   const p = usePaleta();
   if (!dados.length) return <Vazio />;
-  const maior = Math.max(...dados.map((d) => Number(d[chave])));
-  const ult = dados.length - 1;
-  const rotulo = (e: any) =>
-    e.index === ult || Number(e.value) === maior ? (
-      <text x={e.x} y={e.y - 12} textAnchor="middle" style={p.rotuloEstilo as React.CSSProperties}>{e.value}</text>
-    ) : (
-      <g />
-    );
+  const rotulo = (e: any) => (
+    <text x={e.x} y={e.y - 12} textAnchor="middle" style={p.rotuloEstilo as React.CSSProperties}>{e.value}</text>
+  );
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={dados} margin={{ top: 26, right: 28, left: 28, bottom: 4 }}>
@@ -192,16 +187,53 @@ export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: str
   );
 }
 
-/** Parte do todo (até ~6 fatias): cores categóricas em ordem fixa, 2px de superfície entre fatias, total no centro. */
+function useTamanho() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [t, setT] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setT({ w: Math.floor(e!.contentRect.width), h: Math.floor(e!.contentRect.height) }));
+    ro.observe(ref.current!);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, t] as const;
+}
+
+/**
+ * Parte do todo (até ~6 fatias): cores categóricas em ordem fixa, 2px de superfície entre fatias.
+ * Dentro do anel vai a quantidade; fora, com linha de chamada, o nome e a porcentagem. O raio é calculado
+ * pelo espaço real do cartão para que nenhum rótulo seja cortado.
+ */
 export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }[]; cores?: string[] }) {
   const p = usePaleta();
+  const [ref, { w, h }] = useTamanho();
   const total = dados.reduce((a, d) => a + d.valor, 0);
-  if (!total) return <Vazio />;
   const paleta = cores ?? p.cats;
   const pct = (v: number) => Math.round((v / total) * 100);
   const RAD = Math.PI / 180;
-  const rotuloAnel = (e: any) => {
-    if (e.value / total < 0.07) return null;
+
+  const larguraRotulo = Math.min(120, Math.max(...dados.map((d) => (d.nome.length + 5) * 6.6), 40));
+  const R = Math.max(34, Math.min(h / 2 - 20, w / 2 - larguraRotulo - 22));
+
+  const externo = (e: any) => {
+    const cos = Math.cos(-e.midAngle * RAD);
+    const sin = Math.sin(-e.midAngle * RAD);
+    const dir = cos >= 0 ? 1 : -1;
+    const x1 = e.cx + (e.outerRadius + 2) * cos;
+    const y1 = e.cy + (e.outerRadius + 2) * sin;
+    const x2 = e.cx + (e.outerRadius + 12) * cos;
+    const y2 = e.cy + (e.outerRadius + 12) * sin;
+    const x3 = x2 + dir * 8;
+    return (
+      <g>
+        <polyline points={`${x1},${y1} ${x2},${y2} ${x3},${y2}`} fill="none" stroke={p.eixo} strokeWidth={1} />
+        <text x={x3 + dir * 4} y={y2} textAnchor={dir > 0 ? "start" : "end"} dominantBaseline="central" className="rosca-ext">
+          {e.name}
+          <tspan className="rosca-pct" dx="5">{pct(e.value)}%</tspan>
+        </text>
+      </g>
+    );
+  };
+  const interno = (e: any) => {
     const r = (e.innerRadius + e.outerRadius) / 2;
     return (
       <text x={e.cx + r * Math.cos(-e.midAngle * RAD)} y={e.cy + r * Math.sin(-e.midAngle * RAD)} textAnchor="middle" dominantBaseline="central" className="rosca-valor">
@@ -209,36 +241,34 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
       </text>
     );
   };
+
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-        <Tooltip {...p.tooltip} formatter={(v: any, n: any) => [`${v} (${pct(Number(v))}%)`, n]} />
-        <Legend
-          iconType="circle"
-          iconSize={7}
-          verticalAlign="bottom"
-          wrapperStyle={{ fontSize: 12, lineHeight: "18px" }}
-          formatter={(nome: string) => {
-            const d = dados.find((x) => x.nome === nome);
-            return <span style={{ color: p.rotulo }}>{d ? `${nome} · ${d.valor} (${pct(d.valor)}%)` : nome}</span>;
-          }}
-        />
-        <Pie data={dados} dataKey="valor" nameKey="nome" innerRadius="58%" outerRadius="88%" stroke={p.superficie} strokeWidth={2} label={rotuloAnel} labelLine={false} animationDuration={800}>
-          {dados.map((_, i) => (
-            <Cell key={i} fill={paleta[i % paleta.length]} />
-          ))}
-          <Label
-            position="center"
-            content={({ viewBox }: any) => (
-              <g>
-                <text x={viewBox.cx} y={viewBox.cy - 2} textAnchor="middle" className="rosca-total">{total}</text>
-                <text x={viewBox.cx} y={viewBox.cy + 16} textAnchor="middle" className="rosca-rotulo">total</text>
-              </g>
-            )}
-          />
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
+    <div ref={ref} className="rosca-wrap">
+      {!total ? (
+        <Vazio />
+      ) : (
+        w > 0 && (
+          <PieChart width={w} height={h}>
+            <Tooltip {...p.tooltip} formatter={(v: any, n: any) => [`${v} (${pct(Number(v))}%)`, n]} />
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} stroke={p.superficie} strokeWidth={2} label={externo} labelLine={false} animationDuration={800}>
+              {dados.map((_, i) => (
+                <Cell key={i} fill={paleta[i % paleta.length]} />
+              ))}
+              <Label
+                position="center"
+                content={({ viewBox }: any) => (
+                  <g>
+                    <text x={viewBox.cx} y={viewBox.cy - 2} textAnchor="middle" className="rosca-total">{total}</text>
+                    <text x={viewBox.cx} y={viewBox.cy + 16} textAnchor="middle" className="rosca-rotulo">total</text>
+                  </g>
+                )}
+              />
+            </Pie>
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} fill="transparent" stroke="none" label={interno} labelLine={false} tooltipType="none" animationDuration={800} isAnimationActive />
+          </PieChart>
+        )
+      )}
+    </div>
   );
 }
 

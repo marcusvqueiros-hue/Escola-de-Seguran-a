@@ -714,3 +714,8 @@ em { font-style: normal; color: var(--vinho); }
 }
 .topo-fixo { grid-template-columns: minmax(0, 1fr); }
 .topo-fixo > * { min-width: 0; }
+
+.rosca-wrap { width: 100%; height: 100%; display: grid; place-items: center; }
+.rosca-wrap .vazio { min-height: 0; }
+.rosca-ext { fill: var(--ink-1); font-size: 11.5px; font-weight: 600; }
+.rosca-pct { fill: var(--ink-3); font-weight: 600; }
