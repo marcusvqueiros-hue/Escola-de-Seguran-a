@@ -572,3 +572,25 @@ em { font-style: normal; color: var(--vinho); }
 @media (max-width: 1280px) { .grade-painel .card.larga { grid-column: span 8; } }
 @media (max-width: 960px) { .grade-painel .card.larga { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .grade-painel .card.larga { grid-column: 1 / -1; } }
+
+/* ---------- topo fixo (cabeçalho + filtros + indicadores) e filtros compactos ---------- */
+.topo-fixo { display: grid; gap: 8px; }
+.topo-fixo > .kpis { margin-bottom: 2px; }
+.filtros { margin: 0; padding: 8px 14px; border-radius: 14px; }
+.filtros-corpo { gap: 6px 16px; align-items: center; }
+.filtros label, .filtro-chips { display: flex; align-items: center; gap: 6px; }
+.filtros label > span, .filtro-chips > span { font-size: 10px; letter-spacing: 0.06em; }
+.filtros select { height: 28px; padding: 0 8px; border-radius: 8px; font-size: 12px; min-width: 88px; }
+.filtro-chips > div { gap: 4px; }
+.filtro-chips button { height: 26px; padding: 0 9px; border-radius: 8px; font-size: 11px; border-width: 1px; }
+.limpar { height: 28px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
+.cabecalho { padding: 8px 18px; border-radius: 16px; gap: 14px; }
+.cabecalho .logo-neon { transform-origin: left center; }
+.topo-fixo .kpi { padding: 7px 14px; border-radius: 12px; }
+.topo-fixo .kpi span { font-size: 12px; }
+.topo-fixo .kpi strong { font-size: 26px; }
+.app-painel .conteudo { margin-top: 12px; }
+@media (min-width: 1200px) {
+  .topo-fixo { position: sticky; top: 0; z-index: 40; background: var(--bg); padding: 10px 0 8px; margin-top: -10px; box-shadow: 0 10px 14px -12px rgba(0, 0, 0, 0.45); }
+}
+@media (max-width: 640px) { .filtros-corpo { align-items: stretch; } .filtros label, .filtro-chips { display: grid; } }

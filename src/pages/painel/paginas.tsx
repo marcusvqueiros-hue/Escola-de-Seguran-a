@@ -15,8 +15,31 @@ function Kpi({ rotulo, valor, cor }: { rotulo: string; valor: string | number; c
   );
 }
 
+export function KpisEscola({ regs }: { regs: Registro[] }) {
+  const pessoas = useMemo(() => participacoes(regs), [regs]);
+  return (
+    <div className="kpis">
+      <Kpi rotulo="Participantes" valor={regs.length} cor={COR.vinho} />
+      <Kpi rotulo="Horas treinadas" valor={regs.reduce((a, r) => a + r.horas, 0)} cor={COR.vinho} />
+      <Kpi rotulo="Colaboradores" valor={pessoas.length} cor={COR.verde} />
+      <Kpi rotulo="Reincidentes" valor={pessoas.filter((p) => p.qtd > 1).length} cor={COR.vermelho} />
+    </div>
+  );
+}
+
+export function KpisAvaliacao({ regs }: { regs: Registro[] }) {
+  const r = resumoAvaliacao(regs);
+  return (
+    <div className="kpis">
+      <Kpi rotulo="Avaliados" valor={r.avaliados} cor="#0f2fa0" />
+      <Kpi rotulo="Aprovados" valor={r.aprovados} cor={COR.verde} />
+      <Kpi rotulo="Reprovados" valor={r.reprovados} cor={COR.vermelho} />
+      <Kpi rotulo="Média de Notas" valor={fmt(r.media)} cor={COR.cinza} />
+    </div>
+  );
+}
+
 export function PaginaEscola({ regs }: { regs: Registro[] }) {
-  const horas = regs.reduce((a, r) => a + r.horas, 0);
   const meses = porMes(regs, (rs) => ({ valor: rs.length, horas: rs.reduce((a, r) => a + r.horas, 0) }));
   const bases = porCampo(regs, "base", (rs) => ({ valor: rs.length })).sort(ordemBase);
   const gerencias = porCampo(regs, "gerencia", (rs) => ({ valor: rs.length })).sort(ordemBase);
@@ -30,12 +53,6 @@ export function PaginaEscola({ regs }: { regs: Registro[] }) {
 
   return (
     <div className="grade-painel">
-      <div className="kpis">
-        <Kpi rotulo="Participantes" valor={regs.length} cor={COR.vinho} />
-        <Kpi rotulo="Horas treinadas" valor={horas} cor={COR.vinho} />
-        <Kpi rotulo="Colaboradores" valor={pessoas.length} cor={COR.verde} />
-        <Kpi rotulo="Reincidentes" valor={reinc.length} cor={COR.vermelho} />
-      </div>
       <Cartao titulo="Participantes por Mês"><Colunas dados={meses} /></Cartao>
       <Cartao titulo="Participantes por Base"><Colunas dados={bases} /></Cartao>
       <Cartao titulo="Participantes por Gerência"><Colunas dados={gerencias} /></Cartao>
@@ -66,12 +83,6 @@ export function PaginaAvaliacao({ regs }: { regs: Registro[] }) {
 
   return (
     <div className="grade-painel">
-      <div className="kpis">
-        <Kpi rotulo="Avaliados" valor={r.avaliados} cor="#0f2fa0" />
-        <Kpi rotulo="Aprovados" valor={r.aprovados} cor={COR.verde} />
-        <Kpi rotulo="Reprovados" valor={r.reprovados} cor={COR.vermelho} />
-        <Kpi rotulo="Média de Notas" valor={fmt(r.media)} cor={COR.cinza} />
-      </div>
       <Cartao titulo="Avaliação por Mês"><ColunasDuplas dados={meses} /></Cartao>
       <Cartao titulo="Aprovados vs Reprovados por Base"><ColunasDuplas dados={bases} /></Cartao>
       <Cartao titulo="Aprovados vs Reprovados por Gerência"><ColunasDuplas dados={gerencias} /></Cartao>

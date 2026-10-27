@@ -5,7 +5,7 @@ import { Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
 import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
-import { PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
+import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import Configuracao from "./Configuracao";
 import { anosDisponiveis, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
 
@@ -73,6 +73,7 @@ export default function Painel() {
   return (
     <main className="app-painel">
       <AvisoOffline />
+      <div className="topo-fixo">
       <header className="cabecalho">
         <div className="marca">
           <Logo tamanho={44} neon tom="sobreVinho" />
@@ -133,6 +134,10 @@ export default function Painel() {
         </div>
       </section>
       )}
+
+      {aba === "escola" && <KpisEscola regs={filtrados} />}
+      {aba === "avaliacao" && <KpisAvaliacao regs={filtrados} />}
+      </div>
 
       {erro && <p className="erro-msg centro">{erro}</p>}
 
