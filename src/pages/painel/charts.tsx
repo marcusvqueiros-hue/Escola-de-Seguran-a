@@ -211,8 +211,8 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
   const pct = (v: number) => Math.round((v / total) * 100);
   const RAD = Math.PI / 180;
 
-  const larguraRotulo = Math.min(120, Math.max(...dados.map((d) => (d.nome.length + 5) * 6.6), 40));
-  const R = Math.max(34, Math.min(h / 2 - 20, w / 2 - larguraRotulo - 22));
+  // o anel ocupa a altura do cartão; rótulos nas laterais passam para duas linhas (nome / %) quando faltar largura
+  const R = Math.max(40, Math.min(h / 2 - 26, w / 2 - 44));
 
   const externo = (e: any) => {
     const cos = Math.cos(-e.midAngle * RAD);
@@ -223,12 +223,24 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
     const x2 = e.cx + (e.outerRadius + 12) * cos;
     const y2 = e.cy + (e.outerRadius + 12) * sin;
     const x3 = x2 + dir * 8;
+    const livre = dir > 0 ? w - x3 - 8 : x3 - 8;
+    const umaLinha = (String(e.name).length + 5) * 6.4 <= livre;
+    const fonte = livre < String(e.name).length * 6.4 ? 10 : undefined;
     return (
       <g>
         <polyline points={`${x1},${y1} ${x2},${y2} ${x3},${y2}`} fill="none" stroke={p.eixo} strokeWidth={1} />
-        <text x={x3 + dir * 4} y={y2} textAnchor={dir > 0 ? "start" : "end"} dominantBaseline="central" className="rosca-ext">
-          {e.name}
-          <tspan className="rosca-pct" dx="5">{pct(e.value)}%</tspan>
+        <text x={x3 + dir * 4} y={y2} textAnchor={dir > 0 ? "start" : "end"} dominantBaseline="central" className="rosca-ext" style={fonte ? { fontSize: fonte } : undefined}>
+          {umaLinha ? (
+            <>
+              {e.name}
+              <tspan className="rosca-pct" dx="5">{pct(e.value)}%</tspan>
+            </>
+          ) : (
+            <>
+              <tspan x={x3 + dir * 4} dy="-0.55em">{e.name}</tspan>
+              <tspan className="rosca-pct" x={x3 + dir * 4} dy="1.2em">{pct(e.value)}%</tspan>
+            </>
+          )}
         </text>
       </g>
     );
