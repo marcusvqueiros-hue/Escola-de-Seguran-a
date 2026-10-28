@@ -41,7 +41,7 @@ async function iniciar(req: Request) {
   if (!(GERENCIAS as readonly string[]).includes(gerencia)) return erro("Coordenação inválida.");
 
   const id = randomUUID();
-  await sql`INSERT INTO tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia)
+  await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia)
             VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia})`;
   return json({ id, duracaoSeg: DURACAO_SEG });
 }
@@ -49,7 +49,7 @@ async function iniciar(req: Request) {
 async function finalizar(req: Request) {
   const b = await req.json().catch(() => null);
   if (!b) return erro("Requisição inválida.");
-  const [t] = (await sql`SELECT * FROM tentativas WHERE id = ${limpa(b.id, 60)}`) as any[];
+  const [t] = (await sql`SELECT * FROM escola_tentativas WHERE id = ${limpa(b.id, 60)}`) as any[];
   if (!t || t.origem !== "app") return erro("Avaliação não encontrada.", 404);
   if (t.finalizada_em) return erro("Esta avaliação já foi finalizada.", 409);
 
@@ -73,22 +73,22 @@ async function finalizar(req: Request) {
   if (!local || !Number.isFinite(lat) || !Number.isFinite(lng)) return erro("A localização é obrigatória.");
 
   await sql.transaction([
-    sql`INSERT INTO fotos (id, dados) VALUES (${t.id}, ${m[1]!}) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados`,
-    sql`UPDATE tentativas SET finalizada_em = ${new Date(agora).toISOString()}, respostas = ${JSON.stringify(respostas)},
+    sql`INSERT INTO escola_fotos (id, dados) VALUES (${t.id}, ${m[1]!}) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados`,
+    sql`UPDATE escola_tentativas SET finalizada_em = ${new Date(agora).toISOString()}, respostas = ${JSON.stringify(respostas)},
           duracao_seg = ${Math.min(decorrido, DURACAO_SEG)}, tem_foto = TRUE, local = ${local}, lat = ${lat}, lng = ${lng},
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`,
   ]);
 
-  await sql`UPDATE colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
+  await sql`UPDATE escola_colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
 
   const { nota } = corrigir(respostas);
   return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
 }
 
 async function registros(): Promise<Registro[]> {
-  const linhas = (await sql`SELECT * FROM tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`) as any[];
+  const linhas = (await sql`SELECT * FROM escola_tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`) as any[];
   // coordenador: o do cadastro (pelo nome); sem cadastro, o da regra de gerência e base
-  const cadastro = new Map(((await sql`SELECT nome_norm, gerente FROM colaboradores`) as { nome_norm: string; gerente: string | null }[]).map((c) => [c.nome_norm, c.gerente ?? ""]));
+  const cadastro = new Map(((await sql`SELECT nome_norm, gerente FROM escola_colaboradores`) as { nome_norm: string; gerente: string | null }[]).map((c) => [c.nome_norm, c.gerente ?? ""]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]") as (Resposta | null)[];
     const { acertos, nota } = corrigir(respostas);
@@ -127,14 +127,14 @@ export async function api(req: Request): Promise<Response> {
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
       const rs = digitos
-        ? await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8`
-        : await sql`SELECT id, nome, base, matricula FROM colaboradores WHERE nome_norm LIKE ${padrao}
+        ? await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8`
+        : await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE nome_norm LIKE ${padrao}
                     ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
       return json({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
     if (colab && req.method === "GET") {
-      const [c] = (await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM colaboradores WHERE id = ${Number(colab)}`) as any[];
+      const [c] = (await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM escola_colaboradores WHERE id = ${Number(colab)}`) as any[];
       return c ? json(c) : erro("Colaborador não encontrado.", 404);
     }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST") return await iniciar(req);
@@ -156,7 +156,7 @@ export async function api(req: Request): Promise<Response> {
       if (rota === "/api/admin/registros") return json({ registros: await registros(), notaMinima: NOTA_MINIMA });
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {
-        const [f] = (await sql`SELECT dados FROM fotos WHERE id = ${id}`) as { dados: string }[];
+        const [f] = (await sql`SELECT dados FROM escola_fotos WHERE id = ${id}`) as { dados: string }[];
         if (!f) return erro("Foto não encontrada.", 404);
         return new Response(Buffer.from(f.dados, "base64"), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" } });
       }

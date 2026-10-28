@@ -53,3 +53,6 @@ ALTER TABLE escola_tentativas    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE escola_fotos         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE escola_falhas_login  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE escola_colaboradores ENABLE ROW LEVEL SECURITY;
+
+-- Depois de copiar dados com ids explicitos, alinha a sequencia (evita colisao em novos cadastros).
+SELECT setval(pg_get_serial_sequence('escola_colaboradores', 'id'), COALESCE((SELECT MAX(id) FROM escola_colaboradores), 1));

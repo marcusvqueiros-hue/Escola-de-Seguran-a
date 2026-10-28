@@ -34,15 +34,15 @@ const vistos = new Set<string>();
 const unicos = pessoas.filter((p) => (vistos.has(p.norm) ? (avisos.push(`nome repetido com outra chapa: ${p.chapa} ${p.nome}`), false) : (vistos.add(p.norm), true)));
 
 const sql = neon(url);
-await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
+await sql`ALTER TABLE escola_colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
 await sql.transaction([
-  sql`DELETE FROM colaboradores`,
-  sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, situacao)
+  sql`DELETE FROM escola_colaboradores`,
+  sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, situacao)
       SELECT * FROM unnest(${unicos.map((p) => p.nome)}::text[], ${unicos.map((p) => p.norm)}::text[], ${unicos.map((p) => p.chapa)}::text[],
         ${unicos.map(() => "")}::text[], ${unicos.map((p) => p.funcao)}::text[], ${unicos.map((p) => p.base)}::text[],
         ${unicos.map((p) => p.gerencia)}::text[], ${unicos.map((p) => p.situacao)}::text[])`,
 ]);
 
-const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM colaboradores`) as { n: number }[];
+const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_colaboradores`) as { n: number }[];
 console.log(`${linhas.length} linhas na planilha → ${unicos.length} colaboradores únicos; ${n} no banco.`);
 if (avisos.length) console.log(`Avisos (${avisos.length}):\n  ${avisos.slice(0, 15).join("\n  ")}`);

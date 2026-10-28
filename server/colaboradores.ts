@@ -80,7 +80,7 @@ async function importar(b: any) {
   });
   const novoSet = [...porChapa.values()];
 
-  const atuais = ((await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM colaboradores`) as any[]).map(linha);
+  const atuais = ((await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM escola_colaboradores`) as any[]).map(linha);
   const atualPorChapa = new Map(atuais.map((c) => [c.chapa, c]));
 
   const novos: Colab[] = [];
@@ -112,18 +112,18 @@ async function importar(b: any) {
   if (aplicar) {
     const ops: ReturnType<typeof sql>[] = [];
     if (novos.length)
-      ops.push(sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
+      ops.push(sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
         SELECT * FROM unnest(${novos.map((c) => c.nome)}::text[], ${novos.map((c) => chaveNome(c.nome))}::text[], ${novos.map((c) => c.chapa)}::text[],
           ${novos.map(() => "")}::text[], ${novos.map((c) => c.funcao)}::text[], ${novos.map((c) => c.base)}::text[],
           ${novos.map((c) => c.gerencia)}::text[], ${novos.map((c) => c.gerente)}::text[], ${novos.map((c) => c.situacao)}::text[])`);
     if (alterados.length)
-      ops.push(sql`UPDATE colaboradores AS t SET nome = v.nome, nome_norm = v.norm, funcao = v.funcao, base = v.base, gerencia = v.gerencia,
+      ops.push(sql`UPDATE escola_colaboradores AS t SET nome = v.nome, nome_norm = v.norm, funcao = v.funcao, base = v.base, gerencia = v.gerencia,
           gerente = CASE WHEN ${temGerente} THEN v.gerente ELSE t.gerente END, situacao = v.situacao
         FROM (SELECT * FROM unnest(${alterados.map((a) => a.id)}::int[], ${alterados.map((a) => a.c.nome)}::text[], ${alterados.map((a) => chaveNome(a.c.nome))}::text[],
           ${alterados.map((a) => a.c.funcao)}::text[], ${alterados.map((a) => a.c.base)}::text[], ${alterados.map((a) => a.c.gerencia)}::text[],
           ${alterados.map((a) => a.c.gerente)}::text[], ${alterados.map((a) => a.c.situacao)}::text[]) AS x(id, nome, norm, funcao, base, gerencia, gerente, situacao)) AS v
         WHERE t.id = v.id`);
-    if (remover && removidos.length) ops.push(sql`DELETE FROM colaboradores WHERE id = ANY(${removidos.map((c) => c.id!)}::int[])`);
+    if (remover && removidos.length) ops.push(sql`DELETE FROM escola_colaboradores WHERE id = ANY(${removidos.map((c) => c.id!)}::int[])`);
     if (ops.length) await sql.transaction(ops);
   }
 
@@ -142,7 +142,7 @@ async function importar(b: any) {
 export async function rotasColaboradores(req: Request, rota: string): Promise<Response | null> {
   if (rota === "/api/admin/colaboradores") {
     if (req.method === "GET") {
-      const rs = (await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM colaboradores ORDER BY nome_norm`) as any[];
+      const rs = (await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM escola_colaboradores ORDER BY nome_norm`) as any[];
       return json({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
     }
     if (req.method === "POST") {
@@ -150,9 +150,9 @@ export async function rotasColaboradores(req: Request, rota: string): Promise<Re
       if (!c.gerente) c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo) return erro(`Dados inválidos: ${motivo}.`);
-      const [dup] = (await sql`SELECT 1 FROM colaboradores WHERE matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)}`) as unknown[];
+      const [dup] = (await sql`SELECT 1 FROM escola_colaboradores WHERE matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)}`) as unknown[];
       if (dup) return erro("Já existe colaborador com essa chapa ou esse nome.", 409);
-      const [novo] = (await sql`INSERT INTO colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
+      const [novo] = (await sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
         VALUES (${c.nome}, ${chaveNome(c.nome)}, ${c.chapa}, '', ${c.funcao}, ${c.base}, ${c.gerencia}, ${c.gerente}, ${c.situacao}) RETURNING id`) as { id: number }[];
       return json({ ok: true, id: novo!.id }, 201);
     }
@@ -170,14 +170,14 @@ export async function rotasColaboradores(req: Request, rota: string): Promise<Re
       if (!c.gerente) c.gerente = gerenteDe(c.gerencia, c.base);
       const motivo = validar(c);
       if (motivo) return erro(`Dados inválidos: ${motivo}.`);
-      const [dup] = (await sql`SELECT 1 FROM colaboradores WHERE id <> ${id} AND (matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)})`) as unknown[];
+      const [dup] = (await sql`SELECT 1 FROM escola_colaboradores WHERE id <> ${id} AND (matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)})`) as unknown[];
       if (dup) return erro("Outro colaborador já usa essa chapa ou esse nome.", 409);
-      const r = (await sql`UPDATE colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
+      const r = (await sql`UPDATE escola_colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
         base = ${c.base}, gerencia = ${c.gerencia}, gerente = ${c.gerente}, situacao = ${c.situacao} WHERE id = ${id} RETURNING id`) as unknown[];
       return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
     }
     if (req.method === "DELETE") {
-      const r = (await sql`DELETE FROM colaboradores WHERE id = ${id} RETURNING id`) as unknown[];
+      const r = (await sql`DELETE FROM escola_colaboradores WHERE id = ${id} RETURNING id`) as unknown[];
       return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
     }
   }

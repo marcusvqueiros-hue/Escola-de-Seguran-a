@@ -21,17 +21,17 @@ const assinar = (exp: string, segredo: string) => createHmac("sha256", segredo).
 export async function tentarLogin(ip: string, usuario: string, senha: string): Promise<{ token?: string; erro?: string }> {
   const c = config();
   const agora = Date.now();
-  const [f] = (await sql`SELECT n, ate FROM falhas_login WHERE ip = ${ip}`) as { n: number; ate: string }[];
+  const [f] = (await sql`SELECT n, ate FROM escola_falhas_login WHERE ip = ${ip}`) as { n: number; ate: string }[];
   const ativa = f && Number(f.ate) > agora;
   if (ativa && f!.n >= 5) return { erro: "Muitas tentativas. Aguarde alguns minutos." };
 
   if (!(igual(usuario.trim(), c.usuario) && igual(senha, c.senha))) {
     const n = (ativa ? f!.n : 0) + 1;
-    await sql`INSERT INTO falhas_login (ip, n, ate) VALUES (${ip}, ${n}, ${agora + 5 * 60 * 1000})
+    await sql`INSERT INTO escola_falhas_login (ip, n, ate) VALUES (${ip}, ${n}, ${agora + 5 * 60 * 1000})
               ON CONFLICT (ip) DO UPDATE SET n = ${n}, ate = ${agora + 5 * 60 * 1000}`;
     return { erro: "Usuário ou senha inválidos." };
   }
-  await sql`DELETE FROM falhas_login WHERE ip = ${ip}`;
+  await sql`DELETE FROM escola_falhas_login WHERE ip = ${ip}`;
   const exp = String(Math.floor(agora / 1000) + SESSAO_S);
   return { token: `${exp}.${assinar(exp, c.segredo)}` };
 }
