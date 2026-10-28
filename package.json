@@ -10,6 +10,7 @@
     "colaboradores": "bun scripts/importar-colaboradores.ts",
     "icones": "bun scripts/gerar-icones.ts",
     "importar": "bun scripts/importar-xlsx.ts",
+    "supabase:copiar": "bun scripts/copiar-para-supabase.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
