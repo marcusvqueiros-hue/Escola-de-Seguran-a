@@ -66,7 +66,12 @@ const arquivoSeed = Bun.file("server/seed.json");
 const existentes: typeof registros = (await arquivoSeed.exists()) ? await arquivoSeed.json() : [];
 const jaTem = new Set(existentes.map((r) => r.criadoEm));
 const semAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "");
-const novos = registros.filter((r) => !jaTem.has(r.criadoEm)).map((r) => ({ ...r, nome: semAcentos(r.nome) }));
+// Só a primeira resposta de cada matrícula entra; repetições posteriores são ignoradas.
+const matriculas = new Set(existentes.map((r) => r.matricula));
+const novos = registros
+  .filter((r) => !jaTem.has(r.criadoEm))
+  .filter((r) => !matriculas.has(r.matricula) && matriculas.add(r.matricula))
+  .map((r) => ({ ...r, nome: semAcentos(r.nome) }));
 
 await Bun.write("server/seed.json", JSON.stringify([...existentes, ...novos], null, 2));
 console.log(`${existentes.length} mantidos + ${novos.length} novos = ${existentes.length + novos.length} em server/seed.json`);
