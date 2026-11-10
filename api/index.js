@@ -6060,6 +6060,48 @@ var seed_default = [
       "B",
       "C"
     ]
+  },
+  {
+    criadoEm: "2026-10-28T10:49:31-03:00",
+    prefixo: "Anajatuba",
+    matricula: "12787",
+    nome: "NICODEMOS VIANA DOS SANTOS",
+    funcao: "",
+    base: "ITM",
+    gerencia: "GSTC",
+    respostas: [
+      "B",
+      "A",
+      "A",
+      "B",
+      "A",
+      "D",
+      "B",
+      "C",
+      "B",
+      "C"
+    ]
+  },
+  {
+    criadoEm: "2026-10-28T11:04:53-03:00",
+    prefixo: "Anajatuba",
+    matricula: "12787",
+    nome: "NICODEMOS VIANA DOS SANTOS",
+    funcao: "",
+    base: "ITM",
+    gerencia: "GSTC",
+    respostas: [
+      "D",
+      "C",
+      "A",
+      "B",
+      "A",
+      "B",
+      "C",
+      "C",
+      "B",
+      "C"
+    ]
   }
 ];
 

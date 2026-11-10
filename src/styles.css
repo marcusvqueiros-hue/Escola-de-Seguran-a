@@ -386,6 +386,7 @@ em { font-style: normal; color: var(--vinho); }
 }
 .tema-btn:hover { transform: rotate(18deg); }
 .tema-btn.claro { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.25); color: #fff; }
+.tela-cheia-btn:hover { transform: none; }
 .tema-flutuante { position: fixed; top: 14px; right: 14px; z-index: 5; }
 
 /* ---------- autocompletar ---------- */

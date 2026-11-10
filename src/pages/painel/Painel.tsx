@@ -3,6 +3,7 @@ import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
 import { COORDENADORES } from "../../shared/coordenadores";
 import { Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
+import { TelaCheiaBotao } from "../../lib/tela-cheia";
 import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
 import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
@@ -93,6 +94,7 @@ export default function Painel() {
           <InstalarBotao sobreEscuro />
           <button className="link claro" onClick={carregar}>Atualizar</button>
           <button className="link claro" onClick={sair}>Sair</button>
+          <TelaCheiaBotao sobreEscuro />
           <TemaBotao sobreEscuro />
         </div>
       </header>
