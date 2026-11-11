@@ -19,7 +19,7 @@ const PALETAS = {
   sobreVinho: { s: "#ffc9d8", l: "#ffffff" },
 };
 
-export function Logo({ tamanho = 44, neon = false, tom = "auto" }: { tamanho?: number; texto?: boolean; neon?: boolean; tom?: "auto" | "sobreVinho" }) {
+export function Logo({ tamanho = 44, neon = false, tom = "auto", soSimbolo = false }: { tamanho?: number; texto?: boolean; neon?: boolean; tom?: "auto" | "sobreVinho"; soSimbolo?: boolean }) {
   const { tema } = useTema();
   const fid = useId().replace(/:/g, "");
   const u = tamanho / 596;
@@ -70,9 +70,11 @@ export function Logo({ tamanho = 44, neon = false, tom = "auto" }: { tamanho?: n
             ))}
           </svg>
         </span>
-        <span className="neon-parte letras">
-          <span style={{ display: "inline-flex", filter: `url(#contorno-${fid})` }}>{letras}</span>
-        </span>
+        {!soSimbolo && (
+          <span className="neon-parte letras">
+            <span style={{ display: "inline-flex", filter: `url(#contorno-${fid})` }}>{letras}</span>
+          </span>
+        )}
       </span>
     </span>
   );

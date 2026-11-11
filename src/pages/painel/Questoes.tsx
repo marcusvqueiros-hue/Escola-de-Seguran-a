@@ -85,9 +85,9 @@ export default function Questoes({ onAlterou }: { onAlterou: () => void }) {
   return (
     <div className="questoes">
       <div className="kpis">
-        <div className="kpi" style={{ ["--cor" as string]: "var(--serie)" }}><span>Questões cadastradas</span><strong>{lista.length}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--good)" }}><span>Ativas na prova</span><strong>{ativas}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--neutro)" }}><span>Nota mínima (70%)</span><strong>{ativas ? notaMinima(ativas) : "—"}</strong></div>
+        <div className="kpi" style={{ ["--cor" as string]: "var(--serie)" }}><span>Cadastradas</span><strong>{lista.length}</strong></div>
+        <div className="kpi" style={{ ["--cor" as string]: "var(--good)" }}><span>Ativas</span><strong>{ativas}</strong></div>
+        <div className="kpi" style={{ ["--cor" as string]: "var(--neutro)" }}><span>Nota mínima</span><strong>{ativas ? notaMinima(ativas) : "—"}</strong></div>
       </div>
 
       <section className="card q-painel">

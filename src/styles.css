@@ -777,3 +777,87 @@ em { font-style: normal; color: var(--vinho); }
   .questoes .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .q-botoes { margin-left: 0; width: 100%; }
 }
+
+/* ---------- menu lateral do painel ---------- */
+.painel-shell { display: flex; align-items: flex-start; min-height: 100dvh; }
+.painel-corpo { flex: 1 1 0; min-width: 0; }
+.app-painel { max-width: 1560px; }
+
+.menu-lateral {
+  position: sticky; top: 0; align-self: flex-start; height: 100dvh; flex: 0 0 256px; width: 256px; z-index: 70; color: #fff;
+  background: linear-gradient(170deg, #7b1429, #4d0c1b); transition: width 0.25s ease, flex-basis 0.25s ease;
+}
+.menu-lateral.recolhido { flex-basis: 76px; width: 76px; }
+.menu-interno { height: 100%; display: flex; flex-direction: column; gap: 20px; padding: 20px 12px 14px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+.menu-interno::-webkit-scrollbar { display: none; }
+
+.menu-marca { display: grid; gap: 8px; justify-items: start; padding: 2px 6px 0; min-height: 48px; }
+.menu-titulo { font-weight: 750; font-size: 15px; line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; }
+.menu-titulo small { display: block; margin-top: 2px; font-weight: 500; font-size: 11px; opacity: 0.7; }
+
+.menu-nav { display: grid; gap: 4px; }
+.menu-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 14px; border: 0; border-radius: 12px;
+  background: transparent; color: rgba(255, 255, 255, 0.82); font-weight: 600; font-size: 14px; text-align: left; cursor: pointer; white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+.menu-item:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.menu-item:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.menu-item.on { background: #fff; color: #7b1429; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.45); }
+.menu-item .ico { flex: 0 0 20px; }
+
+.menu-rodape { margin-top: auto; display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.menu-instalar .instalar-wrap { display: block; }
+.menu-instalar .instalar-btn { width: 100%; }
+.menu-instalar .instalar-dica { position: static; display: block; margin-top: 6px; font-size: 11px; line-height: 1.35; color: rgba(255, 255, 255, 0.85); }
+.menu-ferramentas { display: flex; gap: 8px; padding: 4px 2px; }
+
+/* botão externo, no canto superior direito do menu (metade para fora) */
+.menu-toggle {
+  position: absolute; top: 24px; right: -14px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; color: #7b1429; cursor: pointer; z-index: 3;
+  box-shadow: 0 4px 12px -3px rgba(0, 0, 0, 0.5); transition: transform 0.2s;
+}
+.menu-toggle:hover { transform: scale(1.08); }
+.menu-toggle:focus-visible { outline: 2px solid #7b1429; outline-offset: 2px; }
+.menu-toggle .ico { width: 16px; height: 16px; transition: transform 0.25s; }
+.menu-lateral.recolhido .menu-toggle .ico { transform: rotate(180deg); }
+
+.menu-lateral.recolhido .menu-rotulo { display: none; }
+.menu-lateral.recolhido .menu-marca { justify-items: center; padding: 2px 0 0; }
+.menu-lateral.recolhido .menu-item { justify-content: center; padding: 0; }
+.menu-lateral.recolhido .menu-instalar .instalar-txt { display: none; }
+.menu-lateral.recolhido .menu-instalar .instalar-btn { padding: 0; }
+.menu-lateral.recolhido .menu-ferramentas { flex-direction: column; align-items: center; }
+
+/* cabeçalho da página: só o título (a marca e as ações ficam no menu) */
+.cabecalho { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 2px 2px 4px !important; color: var(--ink-1); flex-wrap: nowrap; }
+.cabecalho .marca h1 { color: var(--ink-1); font-size: 22px; }
+.cabecalho .marca small { color: var(--ink-3); opacity: 1; }
+.menu-hamb { display: none; width: 40px; height: 40px; flex: none; place-items: center; border-radius: 12px; border: 1px solid var(--hair); background: var(--card); color: var(--ink-1); cursor: pointer; }
+.menu-fundo { display: none; }
+
+/* celular e tablet pequeno: o menu vira gaveta */
+@media (max-width: 900px) {
+  .menu-lateral { position: fixed; left: 0; top: 0; width: 272px; flex: none; transform: translateX(-102%); transition: transform 0.25s ease; box-shadow: none; }
+  .menu-lateral.recolhido { width: 272px; }
+  .menu-lateral.recolhido .menu-rotulo { display: initial; }
+  .menu-lateral.recolhido .menu-marca { justify-items: start; padding: 2px 6px 0; }
+  .menu-lateral.recolhido .menu-item { justify-content: flex-start; padding: 0 14px; }
+  .menu-lateral.recolhido .menu-instalar .instalar-txt { display: inline; }
+  .menu-lateral.recolhido .menu-instalar .instalar-btn { padding: 0 14px; }
+  .menu-lateral.recolhido .menu-ferramentas { flex-direction: row; align-items: stretch; }
+  .menu-lateral.aberto { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.55); }
+  .menu-toggle { display: none; }
+  .menu-fundo { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(10, 5, 8, 0.55); opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .menu-fundo.on { opacity: 1; pointer-events: auto; }
+  .menu-hamb { display: inline-grid; }
+  .cabecalho { gap: 12px !important; }
+  .cabecalho .marca h1 { font-size: 18px; }
+}
+@media (max-width: 640px) {
+  .questoes .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .questoes .kpi { padding: 8px 10px 10px; }
+  .questoes .kpi span { font-size: 11px; }
+  .questoes .kpi strong { font-size: 24px; }
+}

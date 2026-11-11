@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BASES, GERENCIAS, type QuestaoResumo, type Registro } from "../../shared/constantes";
 import { COORDENADORES } from "../../shared/coordenadores";
-import { Logo, Rodape } from "../../components/Logo";
-import { TemaBotao } from "../../lib/tema";
-import { TelaCheiaBotao } from "../../lib/tela-cheia";
-import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
+import { Rodape } from "../../components/Logo";
+import { AvisoOffline } from "../../lib/pwa";
+import { Icone, MenuLateral } from "./Menu";
 import Login from "./Login";
 import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import Configuracao from "./Configuracao";
@@ -32,6 +31,22 @@ export default function Painel() {
   const [filtro, setFiltro] = useState<Filtro>({ ...semFiltro });
   const [erro, setErro] = useState<string | null>(null);
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [recolhido, setRecolhido] = useState(() => {
+    try {
+      return localStorage.getItem("painel:menu") === "recolhido";
+    } catch {
+      return false;
+    }
+  });
+  const [menuAberto, setMenuAberto] = useState(false); // gaveta no celular
+
+  const alternarMenu = () =>
+    setRecolhido((v) => {
+      try {
+        localStorage.setItem("painel:menu", v ? "aberto" : "recolhido");
+      } catch {}
+      return !v;
+    });
 
   const carregar = useCallback(async () => {
     try {
@@ -60,6 +75,7 @@ export default function Painel() {
 
   const trocar = (a: Aba) => {
     setAba(a);
+    setMenuAberto(false);
     history.replaceState(null, "", `#${a}`);
   };
 
@@ -76,30 +92,29 @@ export default function Painel() {
   };
 
   return (
+    <div className="painel-shell">
+    <MenuLateral
+      itens={ABAS}
+      ativo={aba}
+      onEscolher={(id) => trocar(id as Aba)}
+      recolhido={recolhido}
+      onRecolher={alternarMenu}
+      aberto={menuAberto}
+      onFechar={() => setMenuAberto(false)}
+      onAtualizar={carregar}
+      onSair={sair}
+    />
+    <div className="painel-corpo">
     <main className="app-painel">
       <AvisoOffline />
       <div className="topo-fixo">
       <header className="cabecalho">
+        <button type="button" className="menu-hamb" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Icone nome="menu" /></button>
         <div className="marca">
-          <Logo tamanho={44} neon tom="sobreVinho" />
           <div>
-            <h1>Escola de Segurança</h1>
-            <small>{ABAS.find((a) => a.id === aba)!.rotulo} · Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>
+            <h1>{ABAS.find((a) => a.id === aba)!.rotulo}</h1>
+            <small>Escola de Segurança · Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>
           </div>
-        </div>
-        <nav className="abas" role="tablist">
-          {ABAS.map((a) => (
-            <button key={a.id} role="tab" aria-selected={aba === a.id} className={aba === a.id ? "on" : ""} onClick={() => trocar(a.id)}>
-              {a.rotulo}
-            </button>
-          ))}
-        </nav>
-        <div className="cab-acoes">
-          <InstalarBotao sobreEscuro />
-          <button className="link claro" onClick={carregar}>Atualizar</button>
-          <button className="link claro" onClick={sair}>Sair</button>
-          <TelaCheiaBotao sobreEscuro />
-          <TemaBotao sobreEscuro />
         </div>
       </header>
 
@@ -167,5 +182,7 @@ export default function Painel() {
       </div>
       <Rodape />
     </main>
+    </div>
+    </div>
   );
 }
