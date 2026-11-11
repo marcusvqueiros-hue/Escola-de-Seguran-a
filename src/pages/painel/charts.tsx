@@ -295,7 +295,7 @@ export function Rosca({ dados, cores, inter }: { dados: { nome: string; valor: n
         w > 0 && (
           <PieChart width={w} height={h}>
             <Tooltip {...p.tooltip} formatter={(v: any, n: any) => [`${v} (${pct(Number(v))}%)`, n]} />
-            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} stroke={p.superficie} strokeWidth={2} label={externo} labelLine={false} animationDuration={800} onClick={clicar}>
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} stroke={p.superficie} strokeWidth={2} label={externo} labelLine={false} animationDuration={800} onClick={clicar} tooltipType="none">
               {dados.map((_, i) => (
                 <Cell key={i} fill={paleta[i % paleta.length]} fillOpacity={dim(i)} />
               ))}
@@ -309,7 +309,7 @@ export function Rosca({ dados, cores, inter }: { dados: { nome: string; valor: n
                 )}
               />
             </Pie>
-            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} fill="transparent" stroke="none" label={interno} labelLine={false} tooltipType="none" animationDuration={800} isAnimationActive onClick={clicar} />
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} fill="transparent" stroke="none" label={interno} labelLine={false} animationDuration={800} isAnimationActive onClick={clicar} />
           </PieChart>
         )
       )}
