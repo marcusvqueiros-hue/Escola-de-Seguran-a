@@ -72,3 +72,17 @@ CREATE TABLE IF NOT EXISTS escola_usuarios (
   ativo        BOOLEAN NOT NULL DEFAULT TRUE
 );
 ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY;
+
+-- Questões da avaliação (editáveis na aba Questões do painel). O app cria a tabela e carrega as 10 originais sozinho.
+CREATE TABLE IF NOT EXISTS escola_questoes (
+  id        SERIAL PRIMARY KEY,
+  ordem     INTEGER NOT NULL,
+  enunciado TEXT NOT NULL,
+  opcoes    TEXT NOT NULL,
+  correta   TEXT NOT NULL,
+  ativa     BOOLEAN NOT NULL DEFAULT TRUE
+);
+ALTER TABLE escola_questoes ENABLE ROW LEVEL SECURITY;
+-- Cada avaliação guarda as questões recebidas e os acertos, para o histórico não mudar quando o gabarito muda.
+ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS questoes TEXT;
+ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS acertos TEXT;

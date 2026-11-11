@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { iniciarBanco, sql } from "./db";
-import { corrigir } from "./gabarito";
+import { GABARITO } from "./gabarito";
+import { listarQuestoes, questoesAtivas, rotasQuestoes } from "./questoes";
 import { autenticado, cookieLimpo, cookieSessao, tentarLogin } from "./auth";
 import {
   BASES,
@@ -8,11 +9,12 @@ import {
   GERENCIAS,
   HORAS_POR_PARTICIPACAO,
   NOTA_MINIMA,
+  notaMinima,
+  QUESTOES_ORIGINAIS,
   TOLERANCIA_FOTO_SEG,
   type Registro,
   type Resposta,
 } from "../src/shared/constantes";
-import { QUESTOES } from "../src/shared/questoes";
 import { chaveNome } from "../src/shared/texto";
 import { rotasColaboradores } from "./colaboradores";
 import { gerenteDe } from "../src/shared/coordenadores";
@@ -22,7 +24,8 @@ const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
 const erro = (msg: string, status = 400) => json({ erro: msg }, status);
 
 const limpa = (v: unknown, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-const LETRAS = new Set(["A", "B", "C", "D"]);
+const LETRAS_ARR = ["A", "B", "C", "D"] as const;
+const LETRAS = new Set<string>(LETRAS_ARR);
 const ipDe = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 
 async function iniciar(req: Request) {
@@ -40,10 +43,15 @@ async function iniciar(req: Request) {
   if (!(BASES as readonly string[]).includes(base)) return erro("Base inválida.");
   if (!(GERENCIAS as readonly string[]).includes(gerencia)) return erro("Coordenação inválida.");
 
+  const ativas = await questoesAtivas();
+  if (!ativas.length) return erro("Nenhuma questão disponível no momento.", 503);
+
   const id = randomUUID();
-  await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia})`;
-  return json({ id, duracaoSeg: DURACAO_SEG });
+  await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia, questoes)
+            VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia}, ${JSON.stringify(ativas.map((q) => q.id))})`;
+  // a resposta correta nunca sai do servidor
+  const questoes = ativas.map((q) => ({ id: q.id, enunciado: q.enunciado, opcoes: q.opcoes.map((texto, i) => ({ letra: LETRAS_ARR[i]!, texto })) }));
+  return json({ id, duracaoSeg: DURACAO_SEG, questoes });
 }
 
 async function finalizar(req: Request) {
@@ -57,10 +65,16 @@ async function finalizar(req: Request) {
   const decorrido = Math.round((agora - Date.parse(t.iniciada_em)) / 1000);
   if (decorrido > DURACAO_SEG + TOLERANCIA_FOTO_SEG) return erro("O tempo da avaliação esgotou. Inicie novamente.", 410);
 
-  const respostas: (Resposta | null)[] = QUESTOES.map((_, i) => {
+  // as questões são as que o colaborador recebeu ao iniciar; avaliações iniciadas antes do banco editável usam as originais
+  const ids: number[] = t.questoes ? JSON.parse(t.questoes) : QUESTOES_ORIGINAIS;
+  const corretas = new Map(
+    ((await sql`SELECT id, correta, opcoes FROM escola_questoes WHERE id = ANY(${ids}::int[])`) as { id: number; correta: string; opcoes: string }[]).map((q) => [q.id, { correta: q.correta, n: (JSON.parse(q.opcoes) as string[]).length }]),
+  );
+  const respostas: (Resposta | null)[] = ids.map((id, i) => {
     const r = Array.isArray(b.respostas) ? b.respostas[i] : null;
-    return LETRAS.has(r) ? (r as Resposta) : null;
+    return LETRAS.has(r) && LETRAS_ARR.indexOf(r) < (corretas.get(id)?.n ?? 0) ? (r as Resposta) : null;
   });
+  const acertos = ids.map((id, i) => respostas[i] === corretas.get(id)?.correta);
 
   const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.foto ?? ""));
   if (!m) return erro("A foto é obrigatória para finalizar a avaliação.");
@@ -75,14 +89,15 @@ async function finalizar(req: Request) {
   await sql.transaction([
     sql`INSERT INTO escola_fotos (id, dados) VALUES (${t.id}, ${m[1]!}) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados`,
     sql`UPDATE escola_tentativas SET finalizada_em = ${new Date(agora).toISOString()}, respostas = ${JSON.stringify(respostas)},
+          questoes = ${JSON.stringify(ids)}, acertos = ${JSON.stringify(acertos)},
           duracao_seg = ${Math.min(decorrido, DURACAO_SEG)}, tem_foto = TRUE, local = ${local}, lat = ${lat}, lng = ${lng},
           carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`,
   ]);
 
   await sql`UPDATE escola_colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
 
-  const { nota } = corrigir(respostas);
-  return json({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
+  const nota = acertos.filter(Boolean).length;
+  return json({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
 }
 
 async function registros(): Promise<Registro[]> {
@@ -91,7 +106,10 @@ async function registros(): Promise<Registro[]> {
   const cadastro = new Map(((await sql`SELECT nome_norm, gerente FROM escola_colaboradores`) as { nome_norm: string; gerente: string | null }[]).map((c) => [c.nome_norm, c.gerente ?? ""]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]") as (Resposta | null)[];
-    const { acertos, nota } = corrigir(respostas);
+    const questoes: number[] = l.questoes ? JSON.parse(l.questoes) : QUESTOES_ORIGINAIS;
+    const acertos: boolean[] = l.acertos ? JSON.parse(l.acertos) : GABARITO.map((g, i) => respostas[i] === g);
+    const pontos = acertos.filter(Boolean).length;
+    const total = acertos.length || 1;
     return {
       id: l.id,
       data: l.finalizada_em,
@@ -101,10 +119,12 @@ async function registros(): Promise<Registro[]> {
       funcao: l.funcao,
       base: l.base,
       gerencia: l.gerencia,
+      questoes,
       respostas,
       acertos,
-      nota,
-      aprovado: nota >= NOTA_MINIMA,
+      // nota de 0 a 10, qualquer que seja o número de questões da época
+      nota: total === 10 ? pontos : Math.round((pontos / total) * 1000) / 100,
+      aprovado: pontos >= notaMinima(total),
       horas: HORAS_POR_PARTICIPACAO,
       coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
       temFoto: l.tem_foto,
@@ -137,6 +157,10 @@ export async function api(req: Request): Promise<Response> {
       const [c] = (await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM escola_colaboradores WHERE id = ${Number(colab)}`) as any[];
       return c ? json(c) : erro("Colaborador não encontrado.", 404);
     }
+    if (rota === "/api/avaliacao/info" && req.method === "GET") {
+      const total = (await questoesAtivas()).length;
+      return json({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
+    }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST") return await iniciar(req);
     if (rota === "/api/avaliacao/finalizar" && req.method === "POST") return await finalizar(req);
 
@@ -153,7 +177,12 @@ export async function api(req: Request): Promise<Response> {
       if (!autenticado(req)) return erro("Não autorizado.", 401);
       const colab = await rotasColaboradores(req, rota);
       if (colab) return colab;
-      if (rota === "/api/admin/registros") return json({ registros: await registros(), notaMinima: NOTA_MINIMA });
+      const quest = await rotasQuestoes(req, rota);
+      if (quest) return quest;
+      if (rota === "/api/admin/registros") {
+        const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
+        return json({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA });
+      }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {
         const [f] = (await sql`SELECT dados FROM escola_fotos WHERE id = ${id}`) as { dados: string }[];

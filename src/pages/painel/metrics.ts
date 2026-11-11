@@ -1,5 +1,4 @@
-import { QUESTOES } from "../../shared/questoes";
-import type { Registro } from "../../shared/constantes";
+import type { QuestaoResumo, Registro } from "../../shared/constantes";
 
 export const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 export const MESES_LONGO = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -78,34 +77,47 @@ export function mediaPorPessoa(regs: Registro[]) {
 
 export interface ErroQuestao {
   id: number;
+  numero: number;
   enunciado: string;
   erros: number;
+  aplicadas: number; // avaliações que receberam esta questão
   taxa: number;
   quem: { nome: string; base: string; gerencia: string; marcou: string; data: string }[];
 }
 
-export function rankingQuestoes(regs: Registro[]): ErroQuestao[] {
-  return QUESTOES.map((q, i) => {
-    const quem = regs
-      .filter((r) => !r.acertos[i])
-      .map((r) => ({ nome: r.nome, base: r.base, gerencia: r.gerencia, marcou: r.respostas[i] ?? "—", data: r.data }));
-    return { id: q.id, enunciado: q.enunciado, erros: quem.length, taxa: regs.length ? quem.length / regs.length : 0, quem };
-  }).sort((a, b) => b.erros - a.erros || a.id - b.id);
+export function rankingQuestoes(regs: Registro[], questoes: QuestaoResumo[]): ErroQuestao[] {
+  return questoes
+    .map((q) => {
+      let aplicadas = 0;
+      const quem: ErroQuestao["quem"] = [];
+      for (const r of regs) {
+        const i = r.questoes.indexOf(q.id);
+        if (i < 0) continue;
+        aplicadas++;
+        if (!r.acertos[i]) quem.push({ nome: r.nome, base: r.base, gerencia: r.gerencia, marcou: r.respostas[i] ?? "—", data: r.data });
+      }
+      return { id: q.id, numero: q.numero, enunciado: q.enunciado, erros: quem.length, aplicadas, taxa: aplicadas ? quem.length / aplicadas : 0, quem, ativa: q.ativa };
+    })
+    .filter((q) => q.aplicadas > 0 || q.ativa)
+    .map(({ ativa: _, ...q }) => q)
+    .sort((x, y) => y.erros - x.erros || x.numero - y.numero);
 }
 
-export function rankingColaboradores(regs: Registro[]) {
+export function rankingColaboradores(regs: Registro[], questoes: QuestaoResumo[]) {
+  const numero = new Map(questoes.map((q) => [q.id, q.numero]));
   return agrupar(regs, (r) => chaveNome(r.nome), (rs) => {
-    const questoes = new Set<number>();
+    const qs = new Set<number>();
     let erros = 0;
     rs.forEach((r) =>
       r.acertos.forEach((ok, i) => {
         if (!ok) {
           erros++;
-          questoes.add(i + 1);
+          const id = r.questoes[i]!;
+          qs.add(numero.get(id) ?? id);
         }
       }),
     );
-    return { nome: rs[0]!.nome, base: rs[0]!.base, gerencia: rs[0]!.gerencia, coordenador: rs[0]!.coordenador, erros, questoes: [...questoes].sort((a, b) => a - b), tentativas: rs.length };
+    return { nome: rs[0]!.nome, base: rs[0]!.base, gerencia: rs[0]!.gerencia, coordenador: rs[0]!.coordenador, erros, questoes: [...qs].sort((a, b) => a - b), tentativas: rs.length };
   })
     .filter((c) => c.erros > 0)
     .sort((a, b) => b.erros - a.erros || a.nome.localeCompare(b.nome));

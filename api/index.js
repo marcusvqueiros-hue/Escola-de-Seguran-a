@@ -6084,6 +6084,74 @@ var seed_default = [
   }
 ];
 
+// server/gabarito.ts
+var GABARITO = ["B", "C", "A", "B", "A", "B", "A", "C", "B", "C"];
+
+// src/shared/questoes.ts
+var o = (...t) => t.map((texto, i) => ({ letra: "ABCD"[i], texto }));
+var QUESTOES = [
+  {
+    id: 1,
+    enunciado: "Marque a alternativa que corresponde a abertura do sistema em chave fusível na estrutura tipo T?",
+    opcoes: o("Primeiro a mais distante da chave do meio, segundo a chave do meio, terceiro a mais próxima da estrutura.", "Primeira a mais próxima da chave do meio, segundo a mais distante da chave do meio, terceiro a chave do meio.", "Primeiro a mais distante da estrutura, segundo a mais próxima da chave do meio, e terceiro a mais próxima da chave do meio.", "Terceiro a mais próxima da estrutura, segundo a mais distante da chave do meio e primeira a mais distante da estrutura.")
+  },
+  {
+    id: 2,
+    enunciado: "Qual a sequência correta para abertura do sistema em chave fusível na estrutura tipo beco?",
+    opcoes: o("Primeiro a mais próxima da estrutura, segundo a mais distante do meio da estrutura, e terceiro a mais distante da estrutura.", "Primeiro a mais distante da estrutura, segundo a mais próxima do meio da estrutura, e terceiro a mais distante do meio da estrutura.", "Primeiro a do meio da estrutura, segundo a mais distante da estrutura, terceiro a mais próxima da estrutura.", "Mais distante da estrutura do meio, a mais próxima da estrutura e a mais distante.")
+  },
+  {
+    id: 3,
+    enunciado: "Qual o papel do Guardião da Vida?",
+    opcoes: o("Atuar de forma efetiva no gerenciamento dos desvios comportamentais de forma a corrigir, disciplinar e orientar os membros da equipe e/ou parceiro de trabalho quando constatar tal.", "Todas as atividades de risco acentuado deverão ter a presença do Guardião da Vida situação.", "Somente supervisionar a atividade.", "Ficar no Tablet preenchendo formulário e dar baixa de serviço.")
+  },
+  {
+    id: 4,
+    enunciado: "Descreva o significado APR – ANÁLISE PRELIMINAR DE RISCO",
+    opcoes: o("Avaliação da atividade percebendo os riscos existentes.", "Identificação, análise, avaliação e controle dos riscos existentes.", "Marcação dos riscos existentes e controle.", "Conferir apenas o local de trabalho.")
+  },
+  {
+    id: 5,
+    enunciado: "Descreva o passo a passo para o Trabalho em Altura",
+    opcoes: o("Montagem do KIT, amarração do solo, cinto de segurança, talabarte, linha de vida e trava queda.", "Amarrar escada centro e topo, linha de vida, cinto de segurança e trava queda.", "Utilizar cinto de segurança, talabarte, linha de vida e amarração da escada.", "Posicionar somente a escada para escalada.")
+  },
+  {
+    id: 6,
+    enunciado: "Desligamento programado para realizar substituição de uma estrutura. Quantos aterramentos temporários são necessários nesta atividade.",
+    opcoes: o("2", "3", "1", "4")
+  },
+  {
+    id: 7,
+    enunciado: "Desligamento programado para realizar substituição de uma estrutura. Quantos aterramentos temporários são necessários nesta atividade.",
+    opcoes: o("4", "3", "2", "1")
+  },
+  {
+    id: 8,
+    enunciado: "Durante uma atividade em rede energizada, qual EPI é indispensável para proteção contra arco elétrico e contato acidental?",
+    opcoes: o("Óculos de sol.", "Capacete sem jugular.", "Protetor facial e mangas isolantes adequadas à atividade.", "Luvas de vaqueta apenas.")
+  },
+  {
+    id: 9,
+    enunciado: "Qual é a principal finalidade do aterramento temporário em uma atividade de manutenção em rede elétrica?",
+    opcoes: o("Melhorar a comunicação entre os membros da equipe.", "Proteger os trabalhadores contra energização acidental e tensões induzidas.", "Facilitar o transporte de ferramentas.", "Delimitar a área de trabalho.")
+  },
+  {
+    id: 10,
+    enunciado: "Ao identificar uma condição insegura durante a execução de uma atividade, qual deve ser a atitude correta do colaborador?",
+    opcoes: o("Continuar a atividade para não atrasar o serviço.", "Corrigir a situação somente após finalizar a tarefa.", "Interromper a atividade, comunicar a equipe e adotar as medidas de controle necessárias.", "Registrar a condição insegura apenas ao final do expediente.")
+  }
+];
+
+// src/shared/constantes.ts
+var DURACAO_SEG = 20 * 60;
+var TOLERANCIA_FOTO_SEG = 10 * 60;
+var NOTA_MINIMA = 7;
+var notaMinima = (total) => Math.ceil(total * 0.7);
+var QUESTOES_ORIGINAIS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+var HORAS_POR_PARTICIPACAO = 3;
+var BASES = ["BCB", "BDC", "ITM", "PDS", "PDT", "STI"];
+var GERENCIAS = ["GERE", "GOMAN", "GSTC", "ADM", "ALMOXARIFE", "FROTA", "SESMT", "PERDAS", "QSMS", "SPOT"];
+
 // server/db.ts
 var url = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url)
@@ -6170,6 +6238,36 @@ function iniciarBanco() {
         ativo        BOOLEAN NOT NULL DEFAULT TRUE
       )`;
     await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS escola_questoes (
+        id        SERIAL PRIMARY KEY,
+        ordem     INTEGER NOT NULL,
+        enunciado TEXT NOT NULL,
+        opcoes    TEXT NOT NULL,
+        correta   TEXT NOT NULL,
+        ativa     BOOLEAN NOT NULL DEFAULT TRUE
+      )`;
+    await sql`ALTER TABLE escola_questoes ENABLE ROW LEVEL SECURITY`;
+    await sql`ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS questoes TEXT`;
+    await sql`ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS acertos TEXT`;
+    const [{ nq }] = await sql`SELECT COUNT(*)::int AS nq FROM escola_questoes`;
+    if (nq === 0) {
+      await sql.transaction([
+        ...QUESTOES.map((q, i) => sql`
+            INSERT INTO escola_questoes (id, ordem, enunciado, opcoes, correta, ativa)
+            VALUES (${q.id}, ${i + 1}, ${q.enunciado}, ${JSON.stringify(q.opcoes.map((o) => o.texto))}, ${GABARITO[i]}, TRUE)
+            ON CONFLICT (id) DO NOTHING`),
+        sql`SELECT setval(pg_get_serial_sequence('escola_questoes', 'id'), (SELECT MAX(id) FROM escola_questoes))`
+      ]);
+    }
+    const antigas = await sql`SELECT id, respostas FROM escola_tentativas WHERE finalizada_em IS NOT NULL AND acertos IS NULL`;
+    if (antigas.length) {
+      await sql.transaction(antigas.map((t) => {
+        const resp = JSON.parse(t.respostas ?? "[]");
+        const acertos = GABARITO.map((g, i) => resp[i] === g);
+        return sql`UPDATE escola_tentativas SET questoes = ${JSON.stringify(QUESTOES_ORIGINAIS)}, acertos = ${JSON.stringify(acertos)} WHERE id = ${t.id}`;
+      }));
+    }
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM escola_tentativas WHERE origem = 'importado'`;
     if (n === 0) {
       await sql.transaction(seed_default.map((r, i) => sql`
@@ -6183,11 +6281,109 @@ function iniciarBanco() {
   });
 }
 
-// server/gabarito.ts
-var GABARITO = ["B", "C", "A", "B", "A", "B", "A", "C", "B", "C"];
-function corrigir(respostas) {
-  const acertos = GABARITO.map((g, i) => respostas[i] === g);
-  return { acertos, nota: acertos.filter(Boolean).length };
+// server/questoes.ts
+var LETRAS = ["A", "B", "C", "D"];
+var MAX_OPCOES = LETRAS.length;
+var json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+var erro = (msg, status = 400) => json({ erro: msg }, status);
+var limpa = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+var doBanco = (r) => ({ id: r.id, ordem: r.ordem, enunciado: r.enunciado, opcoes: JSON.parse(r.opcoes), correta: r.correta, ativa: r.ativa });
+async function listarQuestoes() {
+  return (await sql`SELECT * FROM escola_questoes ORDER BY ordem, id`).map(doBanco);
+}
+var questoesAtivas = async () => (await listarQuestoes()).filter((q) => q.ativa);
+async function usosPorQuestao() {
+  const rs = await sql`
+    SELECT q.id::int AS id, COUNT(*)::int AS n
+    FROM escola_tentativas t, jsonb_array_elements_text(t.questoes::jsonb) AS q(id)
+    WHERE t.finalizada_em IS NOT NULL AND t.questoes IS NOT NULL
+    GROUP BY 1`;
+  return new Map(rs.map((r) => [r.id, r.n]));
+}
+function validar(b) {
+  const enunciado = limpa(b?.enunciado, 600);
+  if (enunciado.length < 5)
+    return "Escreva o enunciado da questão.";
+  const todas = Array.isArray(b?.opcoes) ? b.opcoes.slice(0, MAX_OPCOES).map((o) => limpa(o, 400)) : [];
+  while (todas.length && !todas[todas.length - 1])
+    todas.pop();
+  if (todas.length < 2)
+    return "Informe pelo menos duas alternativas.";
+  if (todas.some((o) => !o))
+    return "Preencha todas as alternativas ou remova as vazias do final.";
+  const correta = String(b?.correta ?? "").toUpperCase();
+  if (!LETRAS.slice(0, todas.length).includes(correta))
+    return "Marque qual alternativa é a correta.";
+  return { enunciado, opcoes: todas, correta, ativa: b?.ativa !== false };
+}
+async function reaplicarGabarito(id, correta) {
+  const rs = await sql`
+    SELECT id, respostas, questoes, acertos FROM escola_tentativas
+    WHERE finalizada_em IS NOT NULL AND questoes IS NOT NULL AND acertos IS NOT NULL AND questoes::jsonb @> ${JSON.stringify([id])}::jsonb`;
+  const ops = rs.flatMap((t) => {
+    const ids = JSON.parse(t.questoes);
+    const pos = ids.indexOf(id);
+    if (pos < 0)
+      return [];
+    const respostas = JSON.parse(t.respostas ?? "[]");
+    const acertos = JSON.parse(t.acertos);
+    acertos[pos] = respostas[pos] === correta;
+    return [sql`UPDATE escola_tentativas SET acertos = ${JSON.stringify(acertos)} WHERE id = ${t.id}`];
+  });
+  if (ops.length)
+    await sql.transaction(ops);
+  return ops.length;
+}
+async function rotasQuestoes(req, rota) {
+  if (rota === "/api/admin/questoes" && req.method === "GET") {
+    const usos = await usosPorQuestao();
+    const questoes = (await listarQuestoes()).map((q) => ({ ...q, usos: usos.get(q.id) ?? 0 }));
+    return json({ questoes });
+  }
+  if (rota === "/api/admin/questoes" && req.method === "POST") {
+    const v = validar(await req.json().catch(() => null));
+    if (typeof v === "string")
+      return erro(v);
+    const [{ prox }] = await sql`SELECT COALESCE(MAX(ordem), 0)::int + 1 AS prox FROM escola_questoes`;
+    const [nova] = await sql`
+      INSERT INTO escola_questoes (ordem, enunciado, opcoes, correta, ativa)
+      VALUES (${prox}, ${v.enunciado}, ${JSON.stringify(v.opcoes)}, ${v.correta}, ${v.ativa}) RETURNING id`;
+    return json({ ok: true, id: nova.id });
+  }
+  const m = /^\/api\/admin\/questoes\/(\d+)(\/mover)?$/.exec(rota);
+  if (!m)
+    return null;
+  const id = Number(m[1]);
+  const [atual] = await sql`SELECT * FROM escola_questoes WHERE id = ${id}`;
+  if (!atual)
+    return erro("Questão não encontrada.", 404);
+  if (m[2] && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    const todas = await listarQuestoes();
+    const i = todas.findIndex((q) => q.id === id);
+    const j = b?.direcao === "cima" ? i - 1 : b?.direcao === "baixo" ? i + 1 : -1;
+    if (j < 0 || j >= todas.length)
+      return json({ ok: true });
+    const nova = [...todas];
+    [nova[i], nova[j]] = [nova[j], nova[i]];
+    await sql.transaction(nova.map((q, k) => sql`UPDATE escola_questoes SET ordem = ${k + 1} WHERE id = ${q.id}`));
+    return json({ ok: true });
+  }
+  if (req.method === "PUT") {
+    const b = await req.json().catch(() => null);
+    const v = validar(b);
+    if (typeof v === "string")
+      return erro(v);
+    if (!v.ativa && atual.ativa) {
+      const [{ outras }] = await sql`SELECT COUNT(*)::int AS outras FROM escola_questoes WHERE ativa AND id <> ${id}`;
+      if (!outras)
+        return erro("Mantenha pelo menos uma questão ativa.");
+    }
+    await sql`UPDATE escola_questoes SET enunciado = ${v.enunciado}, opcoes = ${JSON.stringify(v.opcoes)}, correta = ${v.correta}, ativa = ${v.ativa} WHERE id = ${id}`;
+    const reaplicadas = b?.reaplicar === true ? await reaplicarGabarito(id, v.correta) : 0;
+    return json({ ok: true, reaplicadas });
+  }
+  return null;
 }
 
 // server/auth.ts
@@ -6242,69 +6438,6 @@ var seguro = (req) => new URL(req.url).protocol === "https:" || req.headers.get(
 var cookieSessao = (token, req) => `sessao=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSAO_S}${seguro(req) ? "; Secure" : ""}`;
 var cookieLimpo = "sessao=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
 
-// src/shared/constantes.ts
-var DURACAO_SEG = 20 * 60;
-var TOLERANCIA_FOTO_SEG = 10 * 60;
-var NOTA_MINIMA = 7;
-var HORAS_POR_PARTICIPACAO = 3;
-var BASES = ["BCB", "BDC", "ITM", "PDS", "PDT", "STI"];
-var GERENCIAS = ["GERE", "GOMAN", "GSTC", "ADM", "ALMOXARIFE", "FROTA", "SESMT", "PERDAS", "QSMS", "SPOT"];
-
-// src/shared/questoes.ts
-var o = (...t) => t.map((texto, i) => ({ letra: "ABCD"[i], texto }));
-var QUESTOES = [
-  {
-    id: 1,
-    enunciado: "Marque a alternativa que corresponde a abertura do sistema em chave fusível na estrutura tipo T?",
-    opcoes: o("Primeiro a mais distante da chave do meio, segundo a chave do meio, terceiro a mais próxima da estrutura.", "Primeira a mais próxima da chave do meio, segundo a mais distante da chave do meio, terceiro a chave do meio.", "Primeiro a mais distante da estrutura, segundo a mais próxima da chave do meio, e terceiro a mais próxima da chave do meio.", "Terceiro a mais próxima da estrutura, segundo a mais distante da chave do meio e primeira a mais distante da estrutura.")
-  },
-  {
-    id: 2,
-    enunciado: "Qual a sequência correta para abertura do sistema em chave fusível na estrutura tipo beco?",
-    opcoes: o("Primeiro a mais próxima da estrutura, segundo a mais distante do meio da estrutura, e terceiro a mais distante da estrutura.", "Primeiro a mais distante da estrutura, segundo a mais próxima do meio da estrutura, e terceiro a mais distante do meio da estrutura.", "Primeiro a do meio da estrutura, segundo a mais distante da estrutura, terceiro a mais próxima da estrutura.", "Mais distante da estrutura do meio, a mais próxima da estrutura e a mais distante.")
-  },
-  {
-    id: 3,
-    enunciado: "Qual o papel do Guardião da Vida?",
-    opcoes: o("Atuar de forma efetiva no gerenciamento dos desvios comportamentais de forma a corrigir, disciplinar e orientar os membros da equipe e/ou parceiro de trabalho quando constatar tal.", "Todas as atividades de risco acentuado deverão ter a presença do Guardião da Vida situação.", "Somente supervisionar a atividade.", "Ficar no Tablet preenchendo formulário e dar baixa de serviço.")
-  },
-  {
-    id: 4,
-    enunciado: "Descreva o significado APR – ANÁLISE PRELIMINAR DE RISCO",
-    opcoes: o("Avaliação da atividade percebendo os riscos existentes.", "Identificação, análise, avaliação e controle dos riscos existentes.", "Marcação dos riscos existentes e controle.", "Conferir apenas o local de trabalho.")
-  },
-  {
-    id: 5,
-    enunciado: "Descreva o passo a passo para o Trabalho em Altura",
-    opcoes: o("Montagem do KIT, amarração do solo, cinto de segurança, talabarte, linha de vida e trava queda.", "Amarrar escada centro e topo, linha de vida, cinto de segurança e trava queda.", "Utilizar cinto de segurança, talabarte, linha de vida e amarração da escada.", "Posicionar somente a escada para escalada.")
-  },
-  {
-    id: 6,
-    enunciado: "Desligamento programado para realizar substituição de uma estrutura. Quantos aterramentos temporários são necessários nesta atividade.",
-    opcoes: o("2", "3", "1", "4")
-  },
-  {
-    id: 7,
-    enunciado: "Desligamento programado para realizar substituição de uma estrutura. Quantos aterramentos temporários são necessários nesta atividade.",
-    opcoes: o("4", "3", "2", "1")
-  },
-  {
-    id: 8,
-    enunciado: "Durante uma atividade em rede energizada, qual EPI é indispensável para proteção contra arco elétrico e contato acidental?",
-    opcoes: o("Óculos de sol.", "Capacete sem jugular.", "Protetor facial e mangas isolantes adequadas à atividade.", "Luvas de vaqueta apenas.")
-  },
-  {
-    id: 9,
-    enunciado: "Qual é a principal finalidade do aterramento temporário em uma atividade de manutenção em rede elétrica?",
-    opcoes: o("Melhorar a comunicação entre os membros da equipe.", "Proteger os trabalhadores contra energização acidental e tensões induzidas.", "Facilitar o transporte de ferramentas.", "Delimitar a área de trabalho.")
-  },
-  {
-    id: 10,
-    enunciado: "Ao identificar uma condição insegura durante a execução de uma atividade, qual deve ser a atitude correta do colaborador?",
-    opcoes: o("Continuar a atividade para não atrasar o serviço.", "Corrigir a situação somente após finalizar a tarefa.", "Interromper a atividade, comunicar a equipe e adotar as medidas de controle necessárias.", "Registrar a condição insegura apenas ao final do expediente.")
-  }
-];
-
 // src/shared/texto.ts
 var chaveNome = (n) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
@@ -6341,8 +6474,8 @@ async function aplicarRegraGerentes(somenteVazios) {
 }
 
 // server/colaboradores.ts
-var json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-var erro = (msg, status = 400) => json({ erro: msg }, status);
+var json2 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+var erro2 = (msg, status = 400) => json2({ erro: msg }, status);
 var txt = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 function limpar(b) {
   return {
@@ -6355,7 +6488,7 @@ function limpar(b) {
     situacao: txt(b?.situacao, 20).toUpperCase() || "ATIVO"
   };
 }
-function validar(c) {
+function validar2(c) {
   if (!/^[A-Za-z0-9._-]{1,20}$/.test(c.chapa))
     return "chapa ausente ou inválida";
   if (c.nome.split(" ").length < 2)
@@ -6389,9 +6522,9 @@ var CAMPOS = [
 async function importar(b) {
   const entrada = Array.isArray(b?.linhas) ? b.linhas : [];
   if (!entrada.length)
-    return erro("A planilha não tem linhas para importar.");
+    return erro2("A planilha não tem linhas para importar.");
   if (entrada.length > 5000)
-    return erro("Planilha grande demais (máximo de 5.000 linhas).");
+    return erro2("Planilha grande demais (máximo de 5.000 linhas).");
   const temGerente = !!b.temGerente;
   const aplicar = !!b.aplicar;
   const remover = !!b.remover;
@@ -6401,7 +6534,7 @@ async function importar(b) {
     const c = limpar(raw);
     if (!c.gerente)
       c.gerente = gerenteDe(c.gerencia, c.base);
-    const motivo = validar(c);
+    const motivo = validar2(c);
     if (motivo)
       return invalidos.push({ linha: i + 2, motivo: `${c.chapa || "?"} ${c.nome || ""}: ${motivo}`.trim() });
     if (!porChapa.has(c.chapa))
@@ -6454,7 +6587,7 @@ async function importar(b) {
       await sql.transaction(ops);
   }
   const amostra = (xs) => xs.slice(0, 60);
-  return json({
+  return json2({
     aplicado: aplicar,
     resumo: { lidos: entrada.length, novos: novos.length, alterados: alterados.length, removidos: removidos.length, invalidos: invalidos.length, semMudanca: novoSet.length - novos.length - alterados.length },
     novos: amostra(novos.map((c) => ({ chapa: c.chapa, nome: c.nome, base: c.base, gerencia: c.gerencia }))),
@@ -6467,26 +6600,26 @@ async function rotasColaboradores(req, rota) {
   if (rota === "/api/admin/colaboradores") {
     if (req.method === "GET") {
       const rs = await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM escola_colaboradores ORDER BY nome_norm`;
-      return json({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
+      return json2({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
     }
     if (req.method === "POST") {
       const c = limpar(await req.json().catch(() => null));
       if (!c.gerente)
         c.gerente = gerenteDe(c.gerencia, c.base);
-      const motivo = validar(c);
+      const motivo = validar2(c);
       if (motivo)
-        return erro(`Dados inválidos: ${motivo}.`);
+        return erro2(`Dados inválidos: ${motivo}.`);
       const [dup] = await sql`SELECT 1 FROM escola_colaboradores WHERE matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)}`;
       if (dup)
-        return erro("Já existe colaborador com essa chapa ou esse nome.", 409);
+        return erro2("Já existe colaborador com essa chapa ou esse nome.", 409);
       const [novo] = await sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
         VALUES (${c.nome}, ${chaveNome(c.nome)}, ${c.chapa}, '', ${c.funcao}, ${c.base}, ${c.gerencia}, ${c.gerente}, ${c.situacao}) RETURNING id`;
-      return json({ ok: true, id: novo.id }, 201);
+      return json2({ ok: true, id: novo.id }, 201);
     }
   }
   if (rota === "/api/admin/colaboradores/gerentes" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
-    return json({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
+    return json2({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
   }
   if (rota === "/api/admin/colaboradores/importar" && req.method === "POST")
     return importar(await req.json().catch(() => null));
@@ -6496,97 +6629,109 @@ async function rotasColaboradores(req, rota) {
       const c = limpar(await req.json().catch(() => null));
       if (!c.gerente)
         c.gerente = gerenteDe(c.gerencia, c.base);
-      const motivo = validar(c);
+      const motivo = validar2(c);
       if (motivo)
-        return erro(`Dados inválidos: ${motivo}.`);
+        return erro2(`Dados inválidos: ${motivo}.`);
       const [dup] = await sql`SELECT 1 FROM escola_colaboradores WHERE id <> ${id} AND (matricula = ${c.chapa} OR nome_norm = ${chaveNome(c.nome)})`;
       if (dup)
-        return erro("Outro colaborador já usa essa chapa ou esse nome.", 409);
+        return erro2("Outro colaborador já usa essa chapa ou esse nome.", 409);
       const r = await sql`UPDATE escola_colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
         base = ${c.base}, gerencia = ${c.gerencia}, gerente = ${c.gerente}, situacao = ${c.situacao} WHERE id = ${id} RETURNING id`;
-      return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
+      return r.length ? json2({ ok: true }) : erro2("Colaborador não encontrado.", 404);
     }
     if (req.method === "DELETE") {
       const r = await sql`DELETE FROM escola_colaboradores WHERE id = ${id} RETURNING id`;
-      return r.length ? json({ ok: true }) : erro("Colaborador não encontrado.", 404);
+      return r.length ? json2({ ok: true }) : erro2("Colaborador não encontrado.", 404);
     }
   }
   return null;
 }
 
 // server/handlers.ts
-var json2 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
-var erro2 = (msg, status = 400) => json2({ erro: msg }, status);
-var limpa = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-var LETRAS = new Set(["A", "B", "C", "D"]);
+var json3 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
+var erro3 = (msg, status = 400) => json3({ erro: msg }, status);
+var limpa2 = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+var LETRAS_ARR = ["A", "B", "C", "D"];
+var LETRAS2 = new Set(LETRAS_ARR);
 var ipDe = (req) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 async function iniciar(req) {
   const b = await req.json().catch(() => null);
   if (!b)
-    return erro2("Requisição inválida.");
-  const nome = limpa(b.nome, 100).toUpperCase();
-  const matricula = limpa(b.matricula, 20);
-  const prefixo = limpa(b.prefixo, 30).toUpperCase();
-  const funcao = limpa(b.funcao, 80).toUpperCase();
-  const base = limpa(b.base, 10).toUpperCase();
-  const gerencia = limpa(b.gerencia, 10).toUpperCase();
+    return erro3("Requisição inválida.");
+  const nome = limpa2(b.nome, 100).toUpperCase();
+  const matricula = limpa2(b.matricula, 20);
+  const prefixo = limpa2(b.prefixo, 30).toUpperCase();
+  const funcao = limpa2(b.funcao, 80).toUpperCase();
+  const base = limpa2(b.base, 10).toUpperCase();
+  const gerencia = limpa2(b.gerencia, 10).toUpperCase();
   if (nome.split(" ").length < 2)
-    return erro2("Informe o nome completo.");
+    return erro3("Informe o nome completo.");
   if (!matricula || !prefixo || !funcao)
-    return erro2("Preencha todos os campos.");
+    return erro3("Preencha todos os campos.");
   if (!BASES.includes(base))
-    return erro2("Base inválida.");
+    return erro3("Base inválida.");
   if (!GERENCIAS.includes(gerencia))
-    return erro2("Coordenação inválida.");
+    return erro3("Coordenação inválida.");
+  const ativas = await questoesAtivas();
+  if (!ativas.length)
+    return erro3("Nenhuma questão disponível no momento.", 503);
   const id = randomUUID();
-  await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia)
-            VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia})`;
-  return json2({ id, duracaoSeg: DURACAO_SEG });
+  await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia, questoes)
+            VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia}, ${JSON.stringify(ativas.map((q) => q.id))})`;
+  const questoes = ativas.map((q) => ({ id: q.id, enunciado: q.enunciado, opcoes: q.opcoes.map((texto, i) => ({ letra: LETRAS_ARR[i], texto })) }));
+  return json3({ id, duracaoSeg: DURACAO_SEG, questoes });
 }
 async function finalizar(req) {
   const b = await req.json().catch(() => null);
   if (!b)
-    return erro2("Requisição inválida.");
-  const [t] = await sql`SELECT * FROM escola_tentativas WHERE id = ${limpa(b.id, 60)}`;
+    return erro3("Requisição inválida.");
+  const [t] = await sql`SELECT * FROM escola_tentativas WHERE id = ${limpa2(b.id, 60)}`;
   if (!t || t.origem !== "app")
-    return erro2("Avaliação não encontrada.", 404);
+    return erro3("Avaliação não encontrada.", 404);
   if (t.finalizada_em)
-    return erro2("Esta avaliação já foi finalizada.", 409);
+    return erro3("Esta avaliação já foi finalizada.", 409);
   const agora = Date.now();
   const decorrido = Math.round((agora - Date.parse(t.iniciada_em)) / 1000);
   if (decorrido > DURACAO_SEG + TOLERANCIA_FOTO_SEG)
-    return erro2("O tempo da avaliação esgotou. Inicie novamente.", 410);
-  const respostas = QUESTOES.map((_, i) => {
+    return erro3("O tempo da avaliação esgotou. Inicie novamente.", 410);
+  const ids = t.questoes ? JSON.parse(t.questoes) : QUESTOES_ORIGINAIS;
+  const corretas = new Map((await sql`SELECT id, correta, opcoes FROM escola_questoes WHERE id = ANY(${ids}::int[])`).map((q) => [q.id, { correta: q.correta, n: JSON.parse(q.opcoes).length }]));
+  const respostas = ids.map((id, i) => {
     const r = Array.isArray(b.respostas) ? b.respostas[i] : null;
-    return LETRAS.has(r) ? r : null;
+    return LETRAS2.has(r) && LETRAS_ARR.indexOf(r) < (corretas.get(id)?.n ?? 0) ? r : null;
   });
+  const acertos = ids.map((id, i) => respostas[i] === corretas.get(id)?.correta);
   const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.foto ?? ""));
   if (!m)
-    return erro2("A foto é obrigatória para finalizar a avaliação.");
+    return erro3("A foto é obrigatória para finalizar a avaliação.");
   const bytes = Buffer.from(m[1], "base64");
   if (bytes.length < 2000 || bytes.length > 3.5 * 1024 * 1024 || bytes[0] !== 255 || bytes[1] !== 216)
-    return erro2("Foto inválida.");
-  const local = limpa(b.local, 300);
+    return erro3("Foto inválida.");
+  const local = limpa2(b.local, 300);
   const lat = Number(b.lat);
   const lng = Number(b.lng);
   if (!local || !Number.isFinite(lat) || !Number.isFinite(lng))
-    return erro2("A localização é obrigatória.");
+    return erro3("A localização é obrigatória.");
   await sql.transaction([
     sql`INSERT INTO escola_fotos (id, dados) VALUES (${t.id}, ${m[1]}) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados`,
     sql`UPDATE escola_tentativas SET finalizada_em = ${new Date(agora).toISOString()}, respostas = ${JSON.stringify(respostas)},
+          questoes = ${JSON.stringify(ids)}, acertos = ${JSON.stringify(acertos)},
           duracao_seg = ${Math.min(decorrido, DURACAO_SEG)}, tem_foto = TRUE, local = ${local}, lat = ${lat}, lng = ${lng},
-          carimbo = ${limpa(b.carimbo, 40)} WHERE id = ${t.id}`
+          carimbo = ${limpa2(b.carimbo, 40)} WHERE id = ${t.id}`
   ]);
   await sql`UPDATE escola_colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
-  const { nota } = corrigir(respostas);
-  return json2({ nota, total: QUESTOES.length, aprovado: nota >= NOTA_MINIMA, notaMinima: NOTA_MINIMA });
+  const nota = acertos.filter(Boolean).length;
+  return json3({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
 }
 async function registros() {
   const linhas = await sql`SELECT * FROM escola_tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`;
   const cadastro = new Map((await sql`SELECT nome_norm, gerente FROM escola_colaboradores`).map((c) => [c.nome_norm, c.gerente ?? ""]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]");
-    const { acertos, nota } = corrigir(respostas);
+    const questoes = l.questoes ? JSON.parse(l.questoes) : QUESTOES_ORIGINAIS;
+    const acertos = l.acertos ? JSON.parse(l.acertos) : GABARITO.map((g, i) => respostas[i] === g);
+    const pontos = acertos.filter(Boolean).length;
+    const total = acertos.length || 1;
     return {
       id: l.id,
       data: l.finalizada_em,
@@ -6596,10 +6741,11 @@ async function registros() {
       funcao: l.funcao,
       base: l.base,
       gerencia: l.gerencia,
+      questoes,
       respostas,
       acertos,
-      nota,
-      aprovado: nota >= NOTA_MINIMA,
+      nota: total === 10 ? pontos : Math.round(pontos / total * 1000) / 100,
+      aprovado: pontos >= notaMinima(total),
       horas: HORAS_POR_PARTICIPACAO,
       coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
       temFoto: l.tem_foto,
@@ -6616,18 +6762,22 @@ async function api(req) {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
       const digitos = /^\d+$/.test(q);
       if (q.length < 2)
-        return json2({ resultados: [] });
+        return json3({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
       const rs = digitos ? await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8` : await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE nome_norm LIKE ${padrao}
                     ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
-      return json2({ resultados: rs });
+      return json3({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
     if (colab && req.method === "GET") {
       const [c] = await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM escola_colaboradores WHERE id = ${Number(colab)}`;
-      return c ? json2(c) : erro2("Colaborador não encontrado.", 404);
+      return c ? json3(c) : erro3("Colaborador não encontrado.", 404);
+    }
+    if (rota === "/api/avaliacao/info" && req.method === "GET") {
+      const total = (await questoesAtivas()).length;
+      return json3({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
     }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST")
       return await iniciar(req);
@@ -6637,33 +6787,38 @@ async function api(req) {
       const b = await req.json().catch(() => ({}));
       const r = await tentarLogin(ipDe(req), String(b.usuario ?? ""), String(b.senha ?? ""));
       if (!r.token)
-        return erro2(r.erro ?? "Falha no login.", 401);
-      return json2({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
+        return erro3(r.erro ?? "Falha no login.", 401);
+      return json3({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
     }
     if (rota === "/api/admin/logout" && req.method === "POST")
-      return json2({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
+      return json3({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
     if (rota === "/api/admin/sessao")
-      return json2({ autenticado: autenticado(req) });
+      return json3({ autenticado: autenticado(req) });
     if (rota.startsWith("/api/admin/")) {
       if (!autenticado(req))
-        return erro2("Não autorizado.", 401);
+        return erro3("Não autorizado.", 401);
       const colab = await rotasColaboradores(req, rota);
       if (colab)
         return colab;
-      if (rota === "/api/admin/registros")
-        return json2({ registros: await registros(), notaMinima: NOTA_MINIMA });
+      const quest = await rotasQuestoes(req, rota);
+      if (quest)
+        return quest;
+      if (rota === "/api/admin/registros") {
+        const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
+        return json3({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA });
+      }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {
         const [f] = await sql`SELECT dados FROM escola_fotos WHERE id = ${id}`;
         if (!f)
-          return erro2("Foto não encontrada.", 404);
+          return erro3("Foto não encontrada.", 404);
         return new Response(Buffer.from(f.dados, "base64"), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" } });
       }
     }
-    return erro2("Rota não encontrada.", 404);
+    return erro3("Rota não encontrada.", 404);
   } catch (e) {
     console.error(e);
-    return erro2("Erro interno. Tente novamente.", 500);
+    return erro3("Erro interno. Tente novamente.", 500);
   }
 }
 

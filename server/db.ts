@@ -1,5 +1,8 @@
 import { Pool } from "pg";
 import seed from "./seed.json";
+import { GABARITO } from "./gabarito";
+import { QUESTOES } from "../src/shared/questoes";
+import { QUESTOES_ORIGINAIS } from "../src/shared/constantes";
 
 const url = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url) throw new Error("DATABASE_URL não configurada (veja o README).");
@@ -95,6 +98,45 @@ export function iniciarBanco() {
         ativo        BOOLEAN NOT NULL DEFAULT TRUE
       )`;
     await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
+
+    // Questões editáveis: cada avaliação guarda os ids que recebeu e o que acertou, então mudar o gabarito não reescreve o histórico.
+    await sql`
+      CREATE TABLE IF NOT EXISTS escola_questoes (
+        id        SERIAL PRIMARY KEY,
+        ordem     INTEGER NOT NULL,
+        enunciado TEXT NOT NULL,
+        opcoes    TEXT NOT NULL,
+        correta   TEXT NOT NULL,
+        ativa     BOOLEAN NOT NULL DEFAULT TRUE
+      )`;
+    await sql`ALTER TABLE escola_questoes ENABLE ROW LEVEL SECURITY`;
+    await sql`ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS questoes TEXT`;
+    await sql`ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS acertos TEXT`;
+
+    const [{ nq }] = (await sql`SELECT COUNT(*)::int AS nq FROM escola_questoes`) as { nq: number }[];
+    if (nq === 0) {
+      await sql.transaction([
+        ...QUESTOES.map(
+          (q, i) => sql`
+            INSERT INTO escola_questoes (id, ordem, enunciado, opcoes, correta, ativa)
+            VALUES (${q.id}, ${i + 1}, ${q.enunciado}, ${JSON.stringify(q.opcoes.map((o) => o.texto))}, ${GABARITO[i]!}, TRUE)
+            ON CONFLICT (id) DO NOTHING`,
+        ),
+        sql`SELECT setval(pg_get_serial_sequence('escola_questoes', 'id'), (SELECT MAX(id) FROM escola_questoes))`,
+      ]);
+    }
+
+    // Avaliações anteriores: grava o resultado com o gabarito original, uma única vez.
+    const antigas = (await sql`SELECT id, respostas FROM escola_tentativas WHERE finalizada_em IS NOT NULL AND acertos IS NULL`) as { id: string; respostas: string | null }[];
+    if (antigas.length) {
+      await sql.transaction(
+        antigas.map((t) => {
+          const resp = JSON.parse(t.respostas ?? "[]") as (string | null)[];
+          const acertos = GABARITO.map((g, i) => resp[i] === g);
+          return sql`UPDATE escola_tentativas SET questoes = ${JSON.stringify(QUESTOES_ORIGINAIS)}, acertos = ${JSON.stringify(acertos)} WHERE id = ${t.id}`;
+        }),
+      );
+    }
 
     const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_tentativas WHERE origem = 'importado'`) as { n: number }[];
     if (n === 0) {

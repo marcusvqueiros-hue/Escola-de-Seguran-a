@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BASES, GERENCIAS, type Registro } from "../../shared/constantes";
+import { BASES, GERENCIAS, type QuestaoResumo, type Registro } from "../../shared/constantes";
 import { COORDENADORES } from "../../shared/coordenadores";
 import { Logo, Rodape } from "../../components/Logo";
 import { TemaBotao } from "../../lib/tema";
@@ -8,12 +8,14 @@ import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
 import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import Configuracao from "./Configuracao";
+import Questoes from "./Questoes";
 import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
   { id: "avaliacao", rotulo: "Avaliação" },
   { id: "detalhamento", rotulo: "Detalhamento" },
+  { id: "questoes", rotulo: "Questões" },
   { id: "configuracao", rotulo: "Configuração" },
 ] as const;
 type Aba = (typeof ABAS)[number]["id"];
@@ -24,6 +26,7 @@ const alterna = (lista: string[], v: string) => (lista.includes(v) ? lista.filte
 export default function Painel() {
   const [auth, setAuth] = useState<"checando" | "nao" | "sim">("checando");
   const [regs, setRegs] = useState<Registro[]>([]);
+  const [questoesLista, setQuestoesLista] = useState<QuestaoResumo[]>([]);
   const [atualizado, setAtualizado] = useState<Date | null>(null);
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [filtro, setFiltro] = useState<Filtro>({ ...semFiltro });
@@ -36,6 +39,7 @@ export default function Painel() {
       if (r.status === 401) return setAuth("nao");
       const d = await r.json();
       setRegs(d.registros);
+      setQuestoesLista(d.questoes ?? []);
       setAtualizado(new Date());
       setErro(null);
       setAuth("sim");
@@ -99,7 +103,7 @@ export default function Painel() {
         </div>
       </header>
 
-      {aba !== "configuracao" && (
+      {aba !== "configuracao" && aba !== "questoes" && (
       <section className="filtros">
         <button className="filtros-toggle" onClick={() => setFiltrosAbertos((a) => !a)} aria-expanded={filtrosAbertos}>
           <span>Filtros{ativo ? " • ativos" : ""}</span>
@@ -157,7 +161,8 @@ export default function Painel() {
       <div className="conteudo" key={aba}>
         {aba === "escola" && <PaginaEscola todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "avaliacao" && <PaginaAvaliacao todos={regs} filtro={filtro} onFiltro={setFiltro} />}
-        {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} />}
+        {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} questoesLista={questoesLista} />}
+        {aba === "questoes" && <Questoes onAlterou={carregar} />}
         {aba === "configuracao" && <Configuracao />}
       </div>
       <Rodape />

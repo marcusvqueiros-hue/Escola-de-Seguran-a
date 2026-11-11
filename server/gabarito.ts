@@ -1,9 +1,5 @@
 import type { Resposta } from "../src/shared/constantes";
 
-// Nunca é enviado ao navegador: a correção acontece só no servidor.
+// Gabarito da prova original: alimenta o banco de questões na primeira execução e as avaliações anteriores a ele.
+// Depois disso, a resposta correta de cada questão fica no banco e é editada na aba Questões do painel.
 export const GABARITO: Resposta[] = ["B", "C", "A", "B", "A", "B", "A", "C", "B", "C"];
-
-export function corrigir(respostas: (Resposta | null)[]) {
-  const acertos = GABARITO.map((g, i) => respostas[i] === g);
-  return { acertos, nota: acertos.filter(Boolean).length };
-}

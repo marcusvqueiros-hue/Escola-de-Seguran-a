@@ -352,7 +352,7 @@ function Detalhe({ titulo, vazio, aberto, children }: { titulo: string; vazio: b
   );
 }
 
-function Janela({ titulo, largo, onFechar, children }: { titulo: string; largo?: boolean; onFechar: () => void; children: React.ReactNode }) {
+export function Janela({ titulo, largo, onFechar, children }: { titulo: string; largo?: boolean; onFechar: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
     window.addEventListener("keydown", f);

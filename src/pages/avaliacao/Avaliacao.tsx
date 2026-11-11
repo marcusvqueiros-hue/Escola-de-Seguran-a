@@ -4,12 +4,11 @@ import {
   DURACAO_SEG,
   FUNCOES,
   GERENCIAS,
-  NOTA_MINIMA,
   TOLERANCIA_FOTO_SEG,
   type Identificacao,
+  type Questao,
   type Resposta,
 } from "../../shared/constantes";
-import { QUESTOES } from "../../shared/questoes";
 import { Fundo, Logo, Rodape } from "../../components/Logo";
 import CapturaFoto from "./CapturaFoto";
 import NomeCombo from "./NomeCombo";
@@ -19,12 +18,13 @@ import { chaveNome } from "../../shared/texto";
 import type { Local } from "./carimbo";
 
 type Etapa = "nome" | "dados" | "regras" | "prova" | "foto" | "fim";
-interface Resultado { nota: number; total: number; aprovado: boolean }
+interface Resultado { nota: number; total: number; aprovado: boolean; notaMinima: number }
 interface Salvo {
   etapa: Etapa;
   ident: Identificacao;
   id?: string;
   prazo?: number;
+  questoes?: Questao[]; // as questões desta avaliação, como o servidor enviou ao iniciar
   respostas: (Resposta | null)[];
   idx: number;
   doCadastro?: boolean;
@@ -35,11 +35,12 @@ const CHAVE = "escola-seguranca:v1";
 const vazio: Identificacao = { nome: "", matricula: "", prefixo: "", funcao: "", base: "", gerencia: "" };
 
 function carregar(): Salvo {
-  const novo: Salvo = { etapa: "nome", ident: vazio, respostas: Array(QUESTOES.length).fill(null), idx: 0 };
+  const novo: Salvo = { etapa: "nome", ident: vazio, respostas: [], idx: 0 };
   try {
     const s = JSON.parse(localStorage.getItem(CHAVE) ?? "null") as Salvo | null;
     if (!s) return novo;
     if (s.etapa === "fim") return novo;
+    if ((s.etapa === "prova" || s.etapa === "foto") && !s.questoes?.length) return novo;
     if ((s.etapa === "prova" || s.etapa === "foto") && (!s.prazo || Date.now() > s.prazo + TOLERANCIA_FOTO_SEG * 1000)) return novo;
     if (s.etapa === "prova" && s.prazo && Date.now() > s.prazo) return { ...s, etapa: "foto" };
     return s;
@@ -56,6 +57,14 @@ export default function Avaliacao() {
   const [carregando, setCarregando] = useState(false);
   const [agora, setAgora] = useState(Date.now());
   const [tempoEsgotado, setTempoEsgotado] = useState(false);
+  const [info, setInfo] = useState<{ total: number; notaMinima: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/avaliacao/info")
+      .then((r) => r.json())
+      .then((d) => d?.total && setInfo({ total: d.total, notaMinima: d.notaMinima }))
+      .catch(() => {});
+  }, []);
 
   const atualizar = (p: Partial<Salvo>) => setS((x) => ({ ...x, ...p }));
   useEffect(() => {
@@ -130,7 +139,7 @@ export default function Avaliacao() {
       if (!r.ok) throw new Error(d.erro);
       setTempoEsgotado(false);
       setAgora(Date.now());
-      atualizar({ etapa: "prova", id: d.id, prazo: Date.now() + d.duracaoSeg * 1000, respostas: Array(QUESTOES.length).fill(null), idx: 0 });
+      atualizar({ etapa: "prova", id: d.id, prazo: Date.now() + d.duracaoSeg * 1000, questoes: d.questoes, respostas: Array(d.questoes.length).fill(null), idx: 0 });
     } catch (e) {
       setErro((e as Error).message || "Falha de conexão. Tente novamente.");
     } finally {
@@ -162,10 +171,11 @@ export default function Avaliacao() {
       localStorage.removeItem(CHAVE);
     } catch {}
     setTempoEsgotado(false);
-    setS({ etapa: "nome", ident: vazio, respostas: Array(QUESTOES.length).fill(null), idx: 0 });
+    setS({ etapa: "nome", ident: vazio, respostas: [], idx: 0 });
   };
 
-  const q = QUESTOES[s.idx]!;
+  const questoes = s.questoes ?? [];
+  const q = questoes[s.idx];
   const passos = useMemo(() => ["nome", "dados", "regras", "prova", "foto"] as Etapa[], []);
 
   return (
@@ -276,9 +286,9 @@ export default function Avaliacao() {
             <p className="sobre">Antes de começar</p>
             <h1>Como funciona a <em>avaliação</em></h1>
             <ul className="regras">
-              <li><b>{QUESTOES.length}</b><span>questões de múltipla escolha, valendo 1 ponto cada</span></li>
+              <li><b>{info?.total ?? "…"}</b><span>questões de múltipla escolha, valendo 1 ponto cada</span></li>
               <li><b>20</b><span>minutos para responder, a contagem começa ao tocar em iniciar</span></li>
-              <li><b>{NOTA_MINIMA}</b><span>pontos é a nota mínima para aprovação</span></li>
+              <li><b>{info?.notaMinima ?? "…"}</b><span>pontos é a nota mínima para aprovação</span></li>
               <li><b>📸</b><span>no final, uma foto sua é obrigatória, com data, hora e localização no carimbo</span></li>
             </ul>
             {erro && <p className="erro-msg">{erro}</p>}
@@ -289,13 +299,13 @@ export default function Avaliacao() {
           </div>
         )}
 
-        {s.etapa === "prova" && (
+        {s.etapa === "prova" && q && (
           <div className="cartao prova">
             <div className="prova-topo">
-              <span>Questão <b>{s.idx + 1}</b> de {QUESTOES.length}</span>
+              <span>Questão <b>{s.idx + 1}</b> de {questoes.length}</span>
               <span>{respondidas} respondida{respondidas === 1 ? "" : "s"}</span>
             </div>
-            <div className="barra"><i style={{ width: `${(respondidas / QUESTOES.length) * 100}%` }} /></div>
+            <div className="barra"><i style={{ width: `${(respondidas / questoes.length) * 100}%` }} /></div>
 
             <div className="questao" key={q.id}>
               <h2>{q.enunciado}</h2>
@@ -316,7 +326,7 @@ export default function Avaliacao() {
             </div>
 
             <div className="pontos">
-              {QUESTOES.map((x, i) => (
+              {questoes.map((x, i) => (
                 <button
                   key={x.id}
                   className={`${i === s.idx ? "atual" : ""} ${s.respostas[i] ? "feito" : ""}`}
@@ -330,21 +340,21 @@ export default function Avaliacao() {
 
             <div className="acoes">
               <button className="btn sec" disabled={s.idx === 0} onClick={() => atualizar({ idx: s.idx - 1 })}>Anterior</button>
-              {s.idx < QUESTOES.length - 1 ? (
+              {s.idx < questoes.length - 1 ? (
                 <button className="btn" onClick={() => atualizar({ idx: s.idx + 1 })}>Próxima <span aria-hidden>→</span></button>
               ) : (
                 <button
                   className="btn"
-                  disabled={respondidas < QUESTOES.length}
-                  title={respondidas < QUESTOES.length ? "Responda todas as questões" : undefined}
+                  disabled={respondidas < questoes.length}
+                  title={respondidas < questoes.length ? "Responda todas as questões" : undefined}
                   onClick={() => atualizar({ etapa: "foto" })}
                 >
                   Registrar foto <span aria-hidden>→</span>
                 </button>
               )}
             </div>
-            {s.idx === QUESTOES.length - 1 && respondidas < QUESTOES.length && (
-              <p className="dica vis">Faltam {QUESTOES.length - respondidas} questão(ões) sem resposta.</p>
+            {s.idx === questoes.length - 1 && respondidas < questoes.length && (
+              <p className="dica vis">Faltam {questoes.length - respondidas} questão(ões) sem resposta.</p>
             )}
           </div>
         )}
@@ -372,7 +382,7 @@ export default function Avaliacao() {
             <p className="sub">
               {s.resultado.aprovado
                 ? "Parabéns! Sua avaliação foi registrada com sucesso."
-                : `Sua avaliação foi registrada. A nota mínima é ${NOTA_MINIMA}. Procure seu gestor para orientações.`}
+                : `Sua avaliação foi registrada. A nota mínima é ${s.resultado.notaMinima}. Procure seu gestor para orientações.`}
             </p>
             <button className="btn sec" onClick={nova}>Nova avaliação</button>
           </div>

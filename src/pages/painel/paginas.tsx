@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Registro } from "../../shared/constantes";
+import type { QuestaoResumo, Registro } from "../../shared/constantes";
 import { NOTA_MINIMA } from "../../shared/constantes";
 import { Cartao, COR, Colunas, ColunasDuplas, Linhas, ListaBarras, Rosca, Vazio } from "./charts";
 import { filtrar, fmt, mediaPorPessoa, media, participacoes, porCampo, porMes, rankingColaboradores, rankingQuestoes, resumoAvaliacao, chaveNome, type Filtro } from "./metrics";
@@ -122,9 +122,9 @@ export function PaginaAvaliacao(props: PropsCruzadas) {
 
 const dataBr = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
-export function PaginaDetalhamento({ regs }: { regs: Registro[] }) {
-  const questoes = useMemo(() => rankingQuestoes(regs), [regs]);
-  const colaboradores = useMemo(() => rankingColaboradores(regs), [regs]);
+export function PaginaDetalhamento({ regs, questoesLista }: { regs: Registro[]; questoesLista: QuestaoResumo[] }) {
+  const questoes = useMemo(() => rankingQuestoes(regs, questoesLista), [regs, questoesLista]);
+  const colaboradores = useMemo(() => rankingColaboradores(regs, questoesLista), [regs, questoesLista]);
   const [sel, setSel] = useState<number | null>(null);
   const atual = questoes.find((q) => q.id === sel) ?? questoes.find((q) => q.erros > 0) ?? questoes[0];
   const maxErros = Math.max(...questoes.map((q) => q.erros), 1);
@@ -140,7 +140,7 @@ export function PaginaDetalhamento({ regs }: { regs: Registro[] }) {
             <li key={q.id} className={q.id === atual?.id ? "sel" : ""}>
               <button onClick={() => setSel(q.id)}>
                 <span className="pos">{i + 1}º</span>
-                <span className="txt"><small>Questão {q.id}</small>{q.enunciado}</span>
+                <span className="txt"><small>Questão {q.numero}</small>{q.enunciado}</span>
                 <span className="barra-e"><i style={{ width: `${(q.erros / maxErros) * 100}%` }} /></span>
                 <b>{q.erros}<small> · {Math.round(q.taxa * 100)}%</small></b>
               </button>
@@ -149,7 +149,7 @@ export function PaginaDetalhamento({ regs }: { regs: Registro[] }) {
         </ol>
       </Cartao>
 
-      <Cartao titulo={atual ? `Quem errou a questão ${atual.id}` : "Quem errou"} alto="auto" className="rank-n">
+      <Cartao titulo={atual ? `Quem errou a questão ${atual.numero}` : "Quem errou"} alto="auto" className="rank-n">
         {atual && atual.quem.length ? (
           <>
             <p className="enunciado-sel">{atual.enunciado}</p>
