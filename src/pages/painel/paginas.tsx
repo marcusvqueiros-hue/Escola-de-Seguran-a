@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import type { Registro } from "../../shared/constantes";
 import { NOTA_MINIMA } from "../../shared/constantes";
 import { Cartao, COR, Colunas, ColunasDuplas, Linhas, ListaBarras, Rosca, Vazio } from "./charts";
-import { fmt, mediaPorPessoa, media, participacoes, porCampo, porMes, rankingColaboradores, rankingQuestoes, resumoAvaliacao, chaveNome } from "./metrics";
+import { filtrar, fmt, mediaPorPessoa, media, participacoes, porCampo, porMes, rankingColaboradores, rankingQuestoes, resumoAvaliacao, chaveNome, type Filtro } from "./metrics";
+import { interacao, semDim, type Dim } from "./cruzar";
 
 const ordemBase = (a: { nome: string; valor: number }, b: { nome: string; valor: number }) => b.valor - a.valor || a.nome.localeCompare(b.nome);
 
@@ -39,61 +40,82 @@ export function KpisAvaliacao({ regs }: { regs: Registro[] }) {
   );
 }
 
-export function PaginaEscola({ regs }: { regs: Registro[] }) {
-  const meses = porMes(regs, (rs) => ({ valor: rs.length, horas: rs.reduce((a, r) => a + r.horas, 0) }));
-  const bases = porCampo(regs, "base", (rs) => ({ valor: rs.length })).sort(ordemBase);
-  const gerencias = porCampo(regs, "gerencia", (rs) => ({ valor: rs.length })).sort(ordemBase);
-  const pessoas = useMemo(() => participacoes(regs), [regs]);
-  const reinc = pessoas.filter((p) => p.qtd > 1);
-  const coordenadores = porCampo(regs, "coordenador", (rs) => ({ valor: rs.length })).sort(ordemBase);
+interface PropsCruzadas {
+  todos: Registro[];
+  filtro: Filtro;
+  onFiltro: (f: Filtro) => void;
+}
+
+/** Cada gráfico mostra todas as suas categorias (com as demais restrições) e destaca a que está selecionada. */
+function useCruzado({ todos, filtro, onFiltro }: PropsCruzadas) {
+  const dados = (d: Dim) => filtrar(todos, semDim(filtro, d));
+  const inter = (d: Dim) => interacao(filtro, onFiltro, d);
+  return { dados, inter };
+}
+
+export function PaginaEscola(props: PropsCruzadas) {
+  const { dados, inter } = useCruzado(props);
+  const meses = porMes(dados("mes"), (rs) => ({ valor: rs.length, horas: rs.reduce((a, r) => a + r.horas, 0) }));
+  const bases = porCampo(dados("base"), "base", (rs) => ({ valor: rs.length })).sort(ordemBase);
+  const gerencias = porCampo(dados("gerencia"), "gerencia", (rs) => ({ valor: rs.length })).sort(ordemBase);
+  const pessoas = participacoes(dados("pessoa"));
+  const coordenadores = porCampo(dados("coordenador"), "coordenador", (rs) => ({ valor: rs.length })).sort(ordemBase);
   const reincPor = (campo: "base" | "gerencia" | "coordenador") =>
-    Object.entries(reinc.reduce<Record<string, number>>((a, p) => ((a[p[campo]] = (a[p[campo]] ?? 0) + 1), a), {}))
+    Object.entries(
+      participacoes(dados(campo))
+        .filter((p) => p.qtd > 1)
+        .reduce<Record<string, number>>((a, p) => ((a[p[campo]] = (a[p[campo]] ?? 0) + 1), a), {}),
+    )
       .map(([nome, valor]) => ({ nome, valor }))
       .sort(ordemBase);
+  const rBase = reincPor("base");
+  const rGer = reincPor("gerencia");
+  const rCoord = reincPor("coordenador");
 
   return (
     <div className="grade-painel">
-      <Cartao titulo="Participantes por Mês" tabela={meses}><Colunas dados={meses} /></Cartao>
-      <Cartao titulo="Participantes por Base" tabela={bases}><Colunas dados={bases} /></Cartao>
-      <Cartao titulo="Participantes por Gerência" tabela={gerencias}><Colunas dados={gerencias} /></Cartao>
+      <Cartao titulo="Participantes por Mês" tabela={meses}><Colunas dados={meses} inter={inter("mes")} /></Cartao>
+      <Cartao titulo="Participantes por Base" tabela={bases}><Colunas dados={bases} inter={inter("base")} /></Cartao>
+      <Cartao titulo="Participantes por Gerência" tabela={gerencias}><Colunas dados={gerencias} inter={inter("gerencia")} /></Cartao>
       <Cartao titulo="Participação na Escola de Segurança" tabela={pessoas.map((x) => ({ nome: x.nome, valor: x.qtd }))} className="alta">
-        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.qtd }))} max={Math.max(...pessoas.map((p) => p.qtd), 1)} destaque={(v) => (v > 1 ? COR.serie : COR.neutro)} />
+        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.qtd }))} max={Math.max(...pessoas.map((p) => p.qtd), 1)} destaque={(v) => (v > 1 ? COR.serie : COR.neutro)} inter={inter("pessoa")} />
       </Cartao>
-      <Cartao titulo="Horas por Mês" tabela={meses}><Linhas dados={meses} chave="horas" /></Cartao>
-      <Cartao titulo="Reincidência por Base" tabela={reincPor("base")}><Rosca dados={reincPor("base")} /></Cartao>
-      <Cartao titulo="Reincidência por Gerência" tabela={reincPor("gerencia")}><Rosca dados={reincPor("gerencia")} /></Cartao>
-      <Cartao titulo="Participantes por Coordenador" tabela={coordenadores} className="larga"><Colunas dados={coordenadores} /></Cartao>
-      <Cartao titulo="Reincidência por Coordenador" tabela={reincPor("coordenador")}><Rosca dados={reincPor("coordenador")} /></Cartao>
+      <Cartao titulo="Horas por Mês" tabela={meses}><Linhas dados={meses} chave="horas" inter={inter("mes")} /></Cartao>
+      <Cartao titulo="Reincidência por Base" tabela={rBase}><Rosca dados={rBase} inter={inter("base")} /></Cartao>
+      <Cartao titulo="Reincidência por Gerência" tabela={rGer}><Rosca dados={rGer} inter={inter("gerencia")} /></Cartao>
+      <Cartao titulo="Participantes por Coordenador" tabela={coordenadores} className="larga"><Colunas dados={coordenadores} inter={inter("coordenador")} /></Cartao>
+      <Cartao titulo="Reincidência por Coordenador" tabela={rCoord}><Rosca dados={rCoord} inter={inter("coordenador")} /></Cartao>
     </div>
   );
 }
 
-export function PaginaAvaliacao({ regs }: { regs: Registro[] }) {
-  const r = resumoAvaliacao(regs);
+export function PaginaAvaliacao(props: PropsCruzadas) {
+  const { dados, inter } = useCruzado(props);
   const split = (rs: Registro[]) => ({ aprovados: rs.filter((x) => x.aprovado).length, reprovados: rs.filter((x) => !x.aprovado).length });
-  const meses = porMes(regs, split);
-  const bases = porCampo(regs, "base", split).sort((a, b) => b.aprovados + b.reprovados - (a.aprovados + a.reprovados));
-  const gerencias = porCampo(regs, "gerencia", split).sort((a, b) => b.aprovados + b.reprovados - (a.aprovados + a.reprovados));
-  const mediaBase = porCampo(regs, "base", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
-  const mediaGer = porCampo(regs, "gerencia", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
-  const coords = porCampo(regs, "coordenador", split).sort((a, b) => b.aprovados + b.reprovados - (a.aprovados + a.reprovados));
-  const mediaCoord = porCampo(regs, "coordenador", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
+  const total = (x: { aprovados: number; reprovados: number }) => x.aprovados + x.reprovados;
+  const meses = porMes(dados("mes"), split);
+  const bases = porCampo(dados("base"), "base", split).sort((a, b) => total(b) - total(a));
+  const gerencias = porCampo(dados("gerencia"), "gerencia", split).sort((a, b) => total(b) - total(a));
+  const mediaBase = porCampo(dados("base"), "base", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
+  const mediaGer = porCampo(dados("gerencia"), "gerencia", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
+  const coords = porCampo(dados("coordenador"), "coordenador", split).sort((a, b) => total(b) - total(a));
+  const mediaCoord = porCampo(dados("coordenador"), "coordenador", (rs) => ({ valor: media(rs.map((x) => x.nota)) })).sort(ordemBase);
   const reprovPorGer = gerencias.filter((g) => g.reprovados > 0).map((g) => ({ nome: g.nome, valor: g.reprovados }));
-  const pessoas = mediaPorPessoa(regs);
+  const pessoas = mediaPorPessoa(dados("pessoa"));
 
   return (
     <div className="grade-painel">
-      <Cartao titulo="Avaliação por Mês" tabela={meses}><ColunasDuplas dados={meses} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Base" tabela={bases}><ColunasDuplas dados={bases} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Gerência" tabela={gerencias}><ColunasDuplas dados={gerencias} /></Cartao>
+      <Cartao titulo="Avaliação por Mês" tabela={meses}><ColunasDuplas dados={meses} inter={inter("mes")} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Base" tabela={bases}><ColunasDuplas dados={bases} inter={inter("base")} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Gerência" tabela={gerencias}><ColunasDuplas dados={gerencias} inter={inter("gerencia")} /></Cartao>
       <Cartao titulo="Média de Avaliação" tabela={pessoas.map((x) => ({ nome: x.nome, valor: x.media }))} className="alta">
-        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.media }))} max={10} formato={(n) => fmt(n)} destaque={(v) => (v >= NOTA_MINIMA ? COR.verde : COR.vermelho)} />
+        <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.media }))} max={10} formato={(n) => fmt(n)} destaque={(v) => (v >= NOTA_MINIMA ? COR.verde : COR.vermelho)} inter={inter("pessoa")} />
       </Cartao>
-      <Cartao titulo="% de Reprovados" tabela={reprovPorGer}><Rosca dados={reprovPorGer} /></Cartao>
-      <Cartao titulo="Avaliação por Base" tabela={mediaBase}><Colunas dados={mediaBase} formato={(n) => fmt(n)} max={10} /></Cartao>
-      <Cartao titulo="Avaliação por Gerência" tabela={mediaGer}><Colunas dados={mediaGer} formato={(n) => fmt(n)} max={10} /></Cartao>
-      <Cartao titulo="Aprovados vs Reprovados por Coordenador" tabela={coords} className="larga"><ColunasDuplas dados={coords} /></Cartao>
-      <Cartao titulo="Avaliação por Coordenador" tabela={mediaCoord}><Colunas dados={mediaCoord} formato={(n) => fmt(n)} max={10} /></Cartao>
+      <Cartao titulo="% de Reprovados" tabela={reprovPorGer}><Rosca dados={reprovPorGer} inter={inter("gerencia")} /></Cartao>
+      <Cartao titulo="Avaliação por Base" tabela={mediaBase}><Colunas dados={mediaBase} formato={(n) => fmt(n)} max={10} inter={inter("base")} /></Cartao>
+      <Cartao titulo="Avaliação por Gerência" tabela={mediaGer}><Colunas dados={mediaGer} formato={(n) => fmt(n)} max={10} inter={inter("gerencia")} /></Cartao>
+      <Cartao titulo="Aprovados vs Reprovados por Coordenador" tabela={coords} className="larga"><ColunasDuplas dados={coords} inter={inter("coordenador")} /></Cartao>
+      <Cartao titulo="Avaliação por Coordenador" tabela={mediaCoord}><Colunas dados={mediaCoord} formato={(n) => fmt(n)} max={10} inter={inter("coordenador")} /></Cartao>
     </div>
   );
 }

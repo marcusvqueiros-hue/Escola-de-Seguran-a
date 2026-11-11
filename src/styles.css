@@ -720,3 +720,13 @@ em { font-style: normal; color: var(--vinho); }
 .rosca-wrap .vazio { min-height: 0; }
 .rosca-ext { fill: var(--ink-1); font-size: 11.5px; font-weight: 600; }
 .rosca-pct { fill: var(--ink-3); font-weight: 600; }
+
+/* ---------- gráficos interativos: clique destaca e filtra ---------- */
+.card .recharts-bar-rectangle, .card .recharts-sector { cursor: pointer; }
+.card .recharts-bar-rectangle, .card .recharts-sector, .card .recharts-dot { transition: opacity 0.2s, fill-opacity 0.2s; }
+.lista-linha.clicavel { cursor: pointer; border-radius: 6px; transition: opacity 0.2s, background 0.2s; }
+.lista-linha.clicavel:hover { background: color-mix(in srgb, var(--serie) 8%, transparent); }
+.lista-linha.clicavel:focus-visible { outline: 2px solid var(--serie); outline-offset: 1px; }
+.lista-linha.sel { background: color-mix(in srgb, var(--serie) 14%, transparent); }
+.lista-linha.dim { opacity: 0.4; }
+.card .recharts-wrapper:focus, .card .recharts-wrapper *:focus, .card .recharts-surface:focus { outline: none; }

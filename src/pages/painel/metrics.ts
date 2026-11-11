@@ -10,8 +10,9 @@ export interface Filtro {
   gerencias: string[];
   bases: string[];
   coordenadores: string[];
+  pessoas: string[]; // chaveNome dos colaboradores escolhidos num gráfico
 }
-export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [], coordenadores: [] };
+export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [], coordenadores: [], pessoas: [] };
 
 export { chaveNome } from "../../shared/texto";
 import { chaveNome } from "../../shared/texto";
@@ -27,7 +28,8 @@ export function filtrar(regs: Registro[], f: Filtro) {
       (f.mes == null || d.getMonth() === f.mes) &&
       (!f.gerencias.length || f.gerencias.includes(r.gerencia)) &&
       (!f.bases.length || f.bases.includes(r.base)) &&
-      (!f.coordenadores.length || f.coordenadores.includes(r.coordenador))
+      (!f.coordenadores.length || f.coordenadores.includes(r.coordenador)) &&
+      (!f.pessoas.length || f.pessoas.includes(chaveNome(r.nome)))
     );
   });
 }

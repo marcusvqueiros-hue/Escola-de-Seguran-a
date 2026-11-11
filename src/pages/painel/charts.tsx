@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTema } from "../../lib/tema";
+import type { Interacao } from "./cruzar";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Legend, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 /** Papéis de cor usados no HTML (valem nos dois temas via CSS). */
@@ -67,6 +68,29 @@ function usePaleta() {
 
 type Linha = { nome: string } & Record<string, number | string>;
 
+const DIM = 0.28; // opacidade do que não foi selecionado
+
+/**
+ * Clique no gráfico: a faixa inteira da categoria é alvo, não só a barra. A categoria vem da posição do clique
+ * (o índice do tooltip pode estar um passo atrás se o mouse acabou de chegar). `ponto`: pontos nas pontas (linha/área).
+ */
+const porClique = (dados: Linha[], inter?: Interacao, margem = { esq: 8, dir: 8 }, ponto = false) =>
+  inter
+    ? (estado: any, ev: any) => {
+        let i = Number(estado?.activeTooltipIndex ?? estado?.activeIndex);
+        const caixa = (ev?.currentTarget as HTMLElement | undefined)?.getBoundingClientRect?.();
+        if (caixa && typeof ev?.clientX === "number" && dados.length) {
+          const larg = caixa.width - margem.esq - margem.dir;
+          const x = ev.clientX - caixa.left - margem.esq;
+          i = ponto ? (dados.length > 1 ? Math.round(x / (larg / (dados.length - 1))) : 0) : Math.floor(x / (larg / dados.length));
+          i = Math.max(0, Math.min(dados.length - 1, i));
+        }
+        const l = dados[i];
+        if (l) inter.clicar(l);
+      }
+    : undefined;
+const opac = (inter: Interacao | undefined, l: Linha) => (inter?.ha && !inter.ativo(l) ? DIM : 1);
+
 const ROTULOS_COLUNA: Record<string, string> = { nome: "Categoria", valor: "Quantidade", horas: "Horas", aprovados: "Aprovados", reprovados: "Reprovados" };
 
 /** Cartão de gráfico, com a tabela dos mesmos dados disponível (equivalente acessível do gráfico). */
@@ -114,18 +138,19 @@ export function Cartao({ titulo, subtitulo, children, className = "", alto = 260
 
 export const Vazio = () => <div className="vazio">Sem dados para os filtros selecionados</div>;
 
-export function Colunas({ dados, chave = "valor", formato, max }: { dados: Linha[]; chave?: string; formato?: (n: number) => string; cor?: string; max?: number }) {
+export function Colunas({ dados, chave = "valor", formato, max, inter }: { dados: Linha[]; chave?: string; formato?: (n: number) => string; cor?: string; max?: number; inter?: Interacao }) {
   const p = usePaleta();
   if (!dados.length) return <Vazio />;
   const fmtv = (v: unknown) => (formato ? formato(Number(v)) : String(v));
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={dados} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="28%">
+      <BarChart data={dados} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="28%" onClick={porClique(dados, inter)} style={inter ? { cursor: "pointer" } : undefined}>
         <CartesianGrid vertical={false} stroke={p.grade} />
         <XAxis dataKey="nome" {...p.eixoX} interval={0} />
         <YAxis hide domain={[0, max ?? "auto"]} />
         <Tooltip {...p.tooltip} formatter={(v: any) => fmtv(v)} />
         <Bar dataKey={chave} fill={p.serie} radius={[4, 4, 0, 0]} maxBarSize={24} animationDuration={700} activeBar={{ fillOpacity: 0.8 }}>
+          {inter && dados.map((l, i) => <Cell key={i} fill={p.serie} fillOpacity={opac(inter, l)} />)}
           <LabelList dataKey={chave} position="top" offset={6} style={p.rotuloEstilo} formatter={fmtv} />
         </Bar>
       </BarChart>
@@ -134,21 +159,23 @@ export function Colunas({ dados, chave = "valor", formato, max }: { dados: Linha
 }
 
 /** Aprovados × reprovados: estado (bom/crítico), por isso as cores de status. */
-export function ColunasDuplas({ dados }: { dados: Linha[] }) {
+export function ColunasDuplas({ dados, inter }: { dados: Linha[]; inter?: Interacao }) {
   const p = usePaleta();
   if (!dados.length) return <Vazio />;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={dados} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barGap={2} barCategoryGap="26%">
+      <BarChart data={dados} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barGap={2} barCategoryGap="26%" onClick={porClique(dados, inter)} style={inter ? { cursor: "pointer" } : undefined}>
         <CartesianGrid vertical={false} stroke={p.grade} />
         <XAxis dataKey="nome" {...p.eixoX} interval={0} />
         <YAxis hide />
         <Tooltip {...p.tooltip} />
         <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: p.rotulo }} formatter={(v: string) => <span style={{ color: p.rotulo }}>{v}</span>} />
         <Bar dataKey="aprovados" name="Aprovados" fill={p.good} radius={[4, 4, 0, 0]} maxBarSize={20} activeBar={{ fillOpacity: 0.8 }}>
+          {inter && dados.map((l, i) => <Cell key={i} fill={p.good} fillOpacity={opac(inter, l)} />)}
           <LabelList dataKey="aprovados" position="top" offset={6} style={p.rotuloEstilo} />
         </Bar>
         <Bar dataKey="reprovados" name="Reprovados" fill={p.crit} radius={[4, 4, 0, 0]} maxBarSize={20} activeBar={{ fillOpacity: 0.8 }}>
+          {inter && dados.map((l, i) => <Cell key={i} fill={p.crit} fillOpacity={opac(inter, l)} />)}
           <LabelList dataKey="reprovados" position="top" offset={6} style={p.rotuloEstilo} />
         </Bar>
       </BarChart>
@@ -157,15 +184,15 @@ export function ColunasDuplas({ dados }: { dados: Linha[] }) {
 }
 
 /** Evolução no tempo: linha de 2px com um véu de 10%, marcadores com anel e o valor em cada ponto (poucos meses). */
-export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: string }) {
+export function Linhas({ dados, chave = "valor", inter }: { dados: Linha[]; chave?: string; inter?: Interacao }) {
   const p = usePaleta();
   if (!dados.length) return <Vazio />;
   const rotulo = (e: any) => (
-    <text x={e.x} y={e.y - 12} textAnchor="middle" style={p.rotuloEstilo as React.CSSProperties}>{e.value}</text>
+    <text x={e.x} y={e.y - 12} textAnchor="middle" style={p.rotuloEstilo as React.CSSProperties} opacity={dados[e.index] ? opac(inter, dados[e.index]!) : 1}>{e.value}</text>
   );
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={dados} margin={{ top: 26, right: 28, left: 28, bottom: 4 }}>
+      <AreaChart data={dados} margin={{ top: 26, right: 28, left: 28, bottom: 4 }} onClick={porClique(dados, inter, { esq: 28, dir: 28 }, true)} style={inter ? { cursor: "pointer" } : undefined}>
         <CartesianGrid vertical={false} stroke={p.grade} />
         <XAxis dataKey="nome" {...p.eixoX} interval={0} />
         <YAxis hide domain={[0, "auto"]} />
@@ -177,7 +204,11 @@ export function Linhas({ dados, chave = "valor" }: { dados: Linha[]; chave?: str
           strokeWidth={2}
           fill={p.serie}
           fillOpacity={0.1}
-          dot={{ r: 4, fill: p.serie, stroke: p.superficie, strokeWidth: 2 }}
+          dot={(d: any) => {
+            const l = dados[d.index];
+            const sel = !!inter?.ha && !!l && inter.ativo(l);
+            return <circle key={d.index} cx={d.cx} cy={d.cy} r={sel ? 6 : 4} fill={p.serie} stroke={p.superficie} strokeWidth={2} opacity={l ? opac(inter, l) : 1} />;
+          }}
           activeDot={{ r: 5, fill: p.serie, stroke: p.superficie, strokeWidth: 2 }}
           label={rotulo}
           animationDuration={900}
@@ -203,13 +234,15 @@ function useTamanho() {
  * Dentro do anel vai a quantidade; fora, com linha de chamada, o nome e a porcentagem. O raio é calculado
  * pelo espaço real do cartão para que nenhum rótulo seja cortado.
  */
-export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }[]; cores?: string[] }) {
+export function Rosca({ dados, cores, inter }: { dados: { nome: string; valor: number }[]; cores?: string[]; inter?: Interacao }) {
   const p = usePaleta();
   const [ref, { w, h }] = useTamanho();
   const total = dados.reduce((a, d) => a + d.valor, 0);
   const paleta = cores ?? p.cats;
   const pct = (v: number) => Math.round((v / total) * 100);
   const RAD = Math.PI / 180;
+  const clicar = inter ? (_: unknown, i: number) => dados[i] && inter.clicar(dados[i]!) : undefined;
+  const dim = (i: number) => (dados[i] ? opac(inter, dados[i]!) : 1);
 
   // o anel ocupa a altura do cartão; rótulos nas laterais passam para duas linhas (nome / %) quando faltar largura
   const R = Math.max(40, Math.min(h / 2 - 26, w / 2 - 44));
@@ -227,7 +260,7 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
     const umaLinha = (String(e.name).length + 5) * 6.4 <= livre;
     const fonte = livre < String(e.name).length * 6.4 ? 10 : undefined;
     return (
-      <g>
+      <g opacity={dim(e.index)}>
         <polyline points={`${x1},${y1} ${x2},${y2} ${x3},${y2}`} fill="none" stroke={p.eixo} strokeWidth={1} />
         <text x={x3 + dir * 4} y={y2} textAnchor={dir > 0 ? "start" : "end"} dominantBaseline="central" className="rosca-ext" style={fonte ? { fontSize: fonte } : undefined}>
           {umaLinha ? (
@@ -248,7 +281,7 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
   const interno = (e: any) => {
     const r = (e.innerRadius + e.outerRadius) / 2;
     return (
-      <text x={e.cx + r * Math.cos(-e.midAngle * RAD)} y={e.cy + r * Math.sin(-e.midAngle * RAD)} textAnchor="middle" dominantBaseline="central" className="rosca-valor">
+      <text x={e.cx + r * Math.cos(-e.midAngle * RAD)} y={e.cy + r * Math.sin(-e.midAngle * RAD)} textAnchor="middle" dominantBaseline="central" className="rosca-valor" opacity={dim(e.index)}>
         {e.value}
       </text>
     );
@@ -262,9 +295,9 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
         w > 0 && (
           <PieChart width={w} height={h}>
             <Tooltip {...p.tooltip} formatter={(v: any, n: any) => [`${v} (${pct(Number(v))}%)`, n]} />
-            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} stroke={p.superficie} strokeWidth={2} label={externo} labelLine={false} animationDuration={800}>
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} stroke={p.superficie} strokeWidth={2} label={externo} labelLine={false} animationDuration={800} onClick={clicar}>
               {dados.map((_, i) => (
-                <Cell key={i} fill={paleta[i % paleta.length]} />
+                <Cell key={i} fill={paleta[i % paleta.length]} fillOpacity={dim(i)} />
               ))}
               <Label
                 position="center"
@@ -276,7 +309,7 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
                 )}
               />
             </Pie>
-            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} fill="transparent" stroke="none" label={interno} labelLine={false} tooltipType="none" animationDuration={800} isAnimationActive />
+            <Pie data={dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={R * 0.6} outerRadius={R} fill="transparent" stroke="none" label={interno} labelLine={false} tooltipType="none" animationDuration={800} isAnimationActive onClick={clicar} />
           </PieChart>
         )
       )}
@@ -285,12 +318,16 @@ export function Rosca({ dados, cores }: { dados: { nome: string; valor: number }
 }
 
 /** Ranking de nomes com barras horizontais finas; o destaque vem de `destaque` (uma cor, o resto fica neutro). */
-export function ListaBarras({ itens, max, formato = (n) => String(n), destaque }: { itens: { nome: string; valor: number; extra?: ReactNode }[]; max: number; formato?: (n: number) => string; destaque?: (v: number) => string }) {
+export function ListaBarras({ itens, max, formato = (n) => String(n), destaque, inter }: { itens: { nome: string; valor: number; extra?: ReactNode }[]; max: number; formato?: (n: number) => string; destaque?: (v: number) => string; inter?: Interacao }) {
   if (!itens.length) return <Vazio />;
   return (
     <div className="lista">
       {itens.map((it, i) => (
-        <div className="lista-linha" key={it.nome + i}>
+        <div
+          className={`lista-linha ${inter ? "clicavel" : ""} ${inter?.ha ? (inter.ativo(it) ? "sel" : "dim") : ""}`}
+          key={it.nome + i}
+          {...(inter ? { role: "button", tabIndex: 0, onClick: () => inter.clicar(it), onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), inter.clicar(it)) } : {})}
+        >
           <span className="lista-nome" title={it.nome}>{it.nome}</span>
           <span className="lista-barra">
             <i style={{ width: `${Math.max(3, (it.valor / max) * 100)}%`, background: destaque?.(it.valor) ?? COR.serie }} />

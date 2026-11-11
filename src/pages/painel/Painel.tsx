@@ -8,7 +8,7 @@ import { AvisoOffline, InstalarBotao } from "../../lib/pwa";
 import Login from "./Login";
 import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import Configuracao from "./Configuracao";
-import { anosDisponiveis, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
+import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
@@ -61,7 +61,7 @@ export default function Painel() {
 
   const anos = useMemo(() => anosDisponiveis(regs), [regs]);
   const filtrados = useMemo(() => filtrar(regs, filtro), [regs, filtro]);
-  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0;
+  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0 || filtro.pessoas.length > 0;
 
   if (auth === "checando") return <div className="carregando">Carregando…</div>;
   if (auth === "nao") return <Login onEntrar={carregar} />;
@@ -132,6 +132,17 @@ export default function Painel() {
           <span>Coordenador</span>
           <div>{COORDENADORES.map((c) => <button key={c} className={filtro.coordenadores.includes(c) ? "on" : ""} onClick={() => setFiltro({ ...filtro, coordenadores: alterna(filtro.coordenadores, c) })}>{c}</button>)}</div>
         </div>
+        {filtro.pessoas.length > 0 && (
+          <div className="filtro-chips">
+            <span>Colaborador</span>
+            <div>
+              {filtro.pessoas.map((k) => {
+                const nome = regs.find((x) => chaveNome(x.nome) === k)?.nome ?? k;
+                return <button key={k} className="on" title="Remover filtro" onClick={() => setFiltro({ ...filtro, pessoas: filtro.pessoas.filter((x) => x !== k) })}>{nome} ✕</button>;
+              })}
+            </div>
+          </div>
+        )}
         <button className="limpar" disabled={!ativo} onClick={() => setFiltro({ ...semFiltro })}>Limpar filtros</button>
         </div>
       </section>
@@ -144,8 +155,8 @@ export default function Painel() {
       {erro && <p className="erro-msg centro">{erro}</p>}
 
       <div className="conteudo" key={aba}>
-        {aba === "escola" && <PaginaEscola regs={filtrados} />}
-        {aba === "avaliacao" && <PaginaAvaliacao regs={filtrados} />}
+        {aba === "escola" && <PaginaEscola todos={regs} filtro={filtro} onFiltro={setFiltro} />}
+        {aba === "avaliacao" && <PaginaAvaliacao todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} />}
         {aba === "configuracao" && <Configuracao />}
       </div>
