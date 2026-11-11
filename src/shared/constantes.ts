@@ -52,6 +52,13 @@ export interface Registro extends Identificacao {
   local: string | null;
 }
 
+/** Quem está logado no painel. */
+export interface Eu {
+  nome: string;
+  usuario: string;
+  admin: boolean;
+}
+
 /** Questão como o administrador a vê (com a resposta correta). */
 export interface QuestaoAdmin {
   id: number;

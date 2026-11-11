@@ -1,22 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BASES, GERENCIAS, type QuestaoResumo, type Registro } from "../../shared/constantes";
+import { BASES, GERENCIAS, type Eu, type QuestaoResumo, type Registro } from "../../shared/constantes";
 import { COORDENADORES } from "../../shared/coordenadores";
 import { Rodape } from "../../components/Logo";
 import { AvisoOffline } from "../../lib/pwa";
+import { TemaBotao } from "../../lib/tema";
+import { TelaCheiaBotao } from "../../lib/tela-cheia";
 import { Icone, MenuLateral } from "./Menu";
 import Login from "./Login";
 import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaEscola } from "./paginas";
 import Configuracao from "./Configuracao";
 import Questoes from "./Questoes";
+import Usuarios from "./Usuarios";
 import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
   { id: "avaliacao", rotulo: "Avaliação" },
   { id: "detalhamento", rotulo: "Detalhamento" },
-  { id: "questoes", rotulo: "Questões" },
-  { id: "configuracao", rotulo: "Configuração" },
+  { id: "questoes", rotulo: "Questões", soAdmin: true },
+  { id: "usuarios", rotulo: "Usuários", soAdmin: true },
+  { id: "configuracao", rotulo: "Configuração", soAdmin: true },
 ] as const;
+const SO_ADMIN: string[] = ABAS.filter((a) => "soAdmin" in a).map((a) => a.id);
 type Aba = (typeof ABAS)[number]["id"];
 
 const abaInicial = (): Aba => ABAS.find((a) => a.id === location.hash.slice(1))?.id ?? "escola";
@@ -26,6 +31,7 @@ export default function Painel() {
   const [auth, setAuth] = useState<"checando" | "nao" | "sim">("checando");
   const [regs, setRegs] = useState<Registro[]>([]);
   const [questoesLista, setQuestoesLista] = useState<QuestaoResumo[]>([]);
+  const [eu, setEu] = useState<Eu | null>(null);
   const [atualizado, setAtualizado] = useState<Date | null>(null);
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [filtro, setFiltro] = useState<Filtro>({ ...semFiltro });
@@ -55,6 +61,7 @@ export default function Painel() {
       const d = await r.json();
       setRegs(d.registros);
       setQuestoesLista(d.questoes ?? []);
+      setEu(d.eu ?? null);
       setAtualizado(new Date());
       setErro(null);
       setAuth("sim");
@@ -72,6 +79,14 @@ export default function Painel() {
     const t = setInterval(carregar, 60000);
     return () => clearInterval(t);
   }, [auth, carregar]);
+
+  // quem só vê relatórios não abre as abas de administração (nem por link direto)
+  useEffect(() => {
+    if (eu && !eu.admin && SO_ADMIN.includes(aba)) {
+      setAba("escola");
+      history.replaceState(null, "", "#escola");
+    }
+  }, [eu, aba]);
 
   const trocar = (a: Aba) => {
     setAba(a);
@@ -94,14 +109,14 @@ export default function Painel() {
   return (
     <div className="painel-shell">
     <MenuLateral
-      itens={ABAS}
+      itens={ABAS.filter((a) => !SO_ADMIN.includes(a.id) || eu?.admin)}
+      eu={eu}
       ativo={aba}
       onEscolher={(id) => trocar(id as Aba)}
       recolhido={recolhido}
       onRecolher={alternarMenu}
       aberto={menuAberto}
       onFechar={() => setMenuAberto(false)}
-      onAtualizar={carregar}
       onSair={sair}
     />
     <div className="painel-corpo">
@@ -116,9 +131,17 @@ export default function Painel() {
             <small>Escola de Segurança · Atualizado em {atualizado?.toLocaleDateString("pt-BR")} {atualizado?.toLocaleTimeString("pt-BR")}</small>
           </div>
         </div>
+        <div className="cab-direita">
+          <button type="button" className="atualizar-btn" onClick={carregar} title="Atualizar os dados" aria-label="Atualizar os dados">
+            <Icone nome="atualizar" />
+            <span>Atualizar</span>
+          </button>
+          <TelaCheiaBotao />
+          <TemaBotao />
+        </div>
       </header>
 
-      {aba !== "configuracao" && aba !== "questoes" && (
+      {!SO_ADMIN.includes(aba) && (
       <section className="filtros">
         <button className="filtros-toggle" onClick={() => setFiltrosAbertos((a) => !a)} aria-expanded={filtrosAbertos}>
           <span>Filtros{ativo ? " • ativos" : ""}</span>
@@ -177,8 +200,9 @@ export default function Painel() {
         {aba === "escola" && <PaginaEscola todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "avaliacao" && <PaginaAvaliacao todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} questoesLista={questoesLista} />}
-        {aba === "questoes" && <Questoes onAlterou={carregar} />}
-        {aba === "configuracao" && <Configuracao />}
+        {aba === "questoes" && eu?.admin && <Questoes onAlterou={carregar} />}
+        {aba === "usuarios" && eu?.admin && <Usuarios eu={eu} />}
+        {aba === "configuracao" && eu?.admin && <Configuracao />}
       </div>
       <Rodape />
     </main>

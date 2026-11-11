@@ -1,7 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Logo } from "../../components/Logo";
-import { TemaBotao } from "../../lib/tema";
-import { TelaCheiaBotao } from "../../lib/tela-cheia";
 import { InstalarBotao } from "../../lib/pwa";
 
 const ICONES: Record<string, string> = {
@@ -9,7 +7,8 @@ const ICONES: Record<string, string> = {
   avaliacao: "M9 3h6v3H9zM7 4.5H6a2 2 0 0 0-2 2V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6.5a2 2 0 0 0-2-2h-1M9 14l2 2 4-4",
   detalhamento: "M5 20V11M12 20V5M19 20v-7",
   questoes: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.2a2.6 2.6 0 1 1 3.6 2.4c-.7.3-1.1.9-1.1 1.6M12 17h.01",
-  configuracao: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+  usuarios: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+  configuracao: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
   atualizar: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
   sair: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   menu: "M4 6h16M4 12h16M4 18h16",
@@ -30,6 +29,7 @@ interface Item {
 }
 
 interface Props {
+  eu: { nome: string; admin: boolean } | null;
   itens: readonly Item[];
   ativo: string;
   onEscolher: (id: string) => void;
@@ -37,7 +37,6 @@ interface Props {
   onRecolher: () => void;
   aberto: boolean; // gaveta no celular
   onFechar: () => void;
-  onAtualizar: () => void;
   onSair: () => void;
 }
 
@@ -54,7 +53,7 @@ function useGaveta() {
   return g;
 }
 
-export function MenuLateral({ itens, ativo, onEscolher, recolhido, onRecolher, aberto, onFechar, onAtualizar, onSair }: Props) {
+export function MenuLateral({ eu, itens, ativo, onEscolher, recolhido, onRecolher, aberto, onFechar, onSair }: Props) {
   const gaveta = useGaveta();
   const compacto = recolhido && !gaveta;
   const acao = (nome: string, rotulo: string, onClick: () => void): ReactNode => (
@@ -91,12 +90,13 @@ export function MenuLateral({ itens, ativo, onEscolher, recolhido, onRecolher, a
           </nav>
 
           <div className="menu-rodape">
+            {eu && (
+              <div className="menu-usuario" title={`${eu.nome} · ${eu.admin ? "Administrador" : "Relatórios"}`}>
+                <span className="menu-avatar" aria-hidden="true">{eu.nome.trim().charAt(0)}</span>
+                <span className="menu-rotulo menu-quem">{eu.nome.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase())}<small>{eu.admin ? "Administrador" : "Somente relatórios"}</small></span>
+              </div>
+            )}
             <div className="menu-instalar"><InstalarBotao sobreEscuro /></div>
-            {acao("atualizar", "Atualizar", onAtualizar)}
-            <div className="menu-ferramentas">
-              <TelaCheiaBotao sobreEscuro />
-              <TemaBotao sobreEscuro />
-            </div>
             {acao("sair", "Sair", onSair)}
           </div>
         </div>

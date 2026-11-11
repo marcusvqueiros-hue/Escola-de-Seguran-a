@@ -10,6 +10,9 @@ function config() {
   return { usuario, senha, segredo: process.env.SESSION_SECRET ?? `escola:${senha}` };
 }
 
+/** Conta do desenvolvedor (variáveis de ambiente): sempre administradora, mesmo que o banco mude. */
+export const ehDesenvolvedor = (usuario: string) => !!process.env.ADMIN_USER && usuario.trim().toLowerCase() === process.env.ADMIN_USER.toLowerCase();
+
 function igual(a: string, b: string) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -28,7 +31,14 @@ function confere(senha: string, guardado: string | undefined) {
   return !!guardado && igual(calc, hash ?? "");
 }
 
-const assinar = (exp: string, segredo: string) => createHmac("sha256", segredo).update(exp).digest("hex");
+const assinar = (corpo: string, segredo: string) => createHmac("sha256", segredo).update(corpo).digest("hex");
+const b64 = (s: string) => Buffer.from(s).toString("base64url");
+
+/** O cookie leva quem entrou (usuário em minúsculas); o perfil é lido do banco a cada requisição. */
+function emitir(chave: string, segredo: string, agora: number) {
+  const corpo = `${b64(chave)}.${Math.floor(agora / 1000) + SESSAO_S}`;
+  return `${corpo}.${assinar(corpo, segredo)}`;
+}
 
 export async function tentarLogin(ip: string, usuario: string, senha: string): Promise<{ token?: string; erro?: string }> {
   const c = config();
@@ -39,7 +49,7 @@ export async function tentarLogin(ip: string, usuario: string, senha: string): P
 
   const chave = usuario.trim().toLowerCase();
   const [u] = (await sql`SELECT senha_hash FROM escola_usuarios WHERE usuario_norm = ${chave} AND ativo`) as { senha_hash: string }[];
-  const valido = confere(senha, u?.senha_hash) || (igual(usuario.trim(), c.usuario) && igual(senha, c.senha));
+  const valido = confere(senha, u?.senha_hash) || (ehDesenvolvedor(usuario) && igual(senha, c.senha));
 
   if (!valido) {
     const n = (ativa ? f!.n : 0) + 1;
@@ -48,15 +58,28 @@ export async function tentarLogin(ip: string, usuario: string, senha: string): P
     return { erro: "Usuário ou senha inválidos." };
   }
   await sql`DELETE FROM escola_falhas_login WHERE ip = ${ip}`;
-  const exp = String(Math.floor(agora / 1000) + SESSAO_S);
-  return { token: `${exp}.${assinar(exp, c.segredo)}` };
+  return { token: emitir(chave, c.segredo, agora) };
 }
 
-export function autenticado(req: Request) {
-  const t = /(?:^|;\s*)sessao=(\d+\.[a-f0-9]+)/.exec(req.headers.get("cookie") ?? "")?.[1];
-  if (!t) return false;
-  const [exp, mac] = t.split(".") as [string, string];
-  return Number(exp) > Date.now() / 1000 && igual(mac, assinar(exp, config().segredo));
+export interface Sessao {
+  usuario: string;
+  nome: string;
+  admin: boolean;
+  desenvolvedor: boolean;
+}
+
+/** Quem está logado, com o perfil atual. Usuário removido ou desativado perde o acesso na hora. */
+export async function sessaoDe(req: Request): Promise<Sessao | null> {
+  const t = /(?:^|;\s*)sessao=([\w-]+\.\d+\.[a-f0-9]+)/.exec(req.headers.get("cookie") ?? "")?.[1];
+  if (!t) return null;
+  const [chaveB64, exp, mac] = t.split(".") as [string, string, string];
+  if (!(Number(exp) > Date.now() / 1000) || !igual(mac, assinar(`${chaveB64}.${exp}`, config().segredo))) return null;
+
+  const chave = Buffer.from(chaveB64, "base64url").toString();
+  const [u] = (await sql`SELECT usuario, nome, admin, ativo FROM escola_usuarios WHERE usuario_norm = ${chave}`) as { usuario: string; nome: string | null; admin: boolean; ativo: boolean }[];
+  if (ehDesenvolvedor(chave)) return { usuario: u?.usuario ?? chave, nome: u?.nome || "Desenvolvedor", admin: true, desenvolvedor: true };
+  if (!u || !u.ativo) return null;
+  return { usuario: u.usuario, nome: u.nome || u.usuario, admin: u.admin, desenvolvedor: false };
 }
 
 const seguro = (req: Request) => new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";

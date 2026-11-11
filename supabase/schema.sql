@@ -86,3 +86,6 @@ ALTER TABLE escola_questoes ENABLE ROW LEVEL SECURITY;
 -- Cada avaliação guarda as questões recebidas e os acertos, para o histórico não mudar quando o gabarito muda.
 ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS questoes TEXT;
 ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS acertos TEXT;
+
+-- Perfil de acesso ao painel: admin = TRUE vê também Questões, Usuários e Configuração (gerenciado na aba Usuários).
+ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE;

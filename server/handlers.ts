@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { iniciarBanco, sql } from "./db";
 import { GABARITO } from "./gabarito";
 import { listarQuestoes, questoesAtivas, rotasQuestoes } from "./questoes";
-import { autenticado, cookieLimpo, cookieSessao, tentarLogin } from "./auth";
+import { cookieLimpo, cookieSessao, sessaoDe, tentarLogin } from "./auth";
+import { rotasUsuarios } from "./usuarios";
 import {
   BASES,
   DURACAO_SEG,
@@ -171,17 +172,22 @@ export async function api(req: Request): Promise<Response> {
       return json({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
     }
     if (rota === "/api/admin/logout" && req.method === "POST") return json({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
-    if (rota === "/api/admin/sessao") return json({ autenticado: autenticado(req) });
+    if (rota === "/api/admin/sessao") return json({ autenticado: !!(await sessaoDe(req)) });
 
     if (rota.startsWith("/api/admin/")) {
-      if (!autenticado(req)) return erro("Não autorizado.", 401);
+      const eu = await sessaoDe(req);
+      if (!eu) return erro("Não autorizado.", 401);
+      // relatórios (registros e fotos) para qualquer usuário; o restante só para administradores
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
+      const usr = await rotasUsuarios(req, rota, eu);
+      if (usr) return usr;
       const colab = await rotasColaboradores(req, rota);
       if (colab) return colab;
       const quest = await rotasQuestoes(req, rota);
       if (quest) return quest;
       if (rota === "/api/admin/registros") {
         const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
-        return json({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA });
+        return json({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
       }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {
