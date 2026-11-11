@@ -149,6 +149,8 @@ export default function Painel() {
           <i>{filtrosAbertos ? "▲" : "▼"}</i>
         </button>
         <div className={`filtros-corpo ${filtrosAbertos ? "aberto" : ""}`}>
+        <div className="filtro-grupo" data-filtro="periodo">
+        <span className="legenda">Período</span>
         <label>
           <span>Ano</span>
           <select value={filtro.ano ?? ""} onChange={(e) => setFiltro({ ...filtro, ano: e.target.value ? Number(e.target.value) : null })}>
@@ -163,24 +165,25 @@ export default function Painel() {
             {MESES_LONGO.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
         </label>
-        <div className="filtro-chips">
+        </div>
+        <div className="filtro-chips" data-filtro="gerencia">
           <span>Gerência</span>
           <div>{GERENCIAS.map((g) => <button key={g} className={filtro.gerencias.includes(g) ? "on" : ""} onClick={() => setFiltro({ ...filtro, gerencias: alterna(filtro.gerencias, g) })}>{g}</button>)}</div>
         </div>
-        <div className="filtro-chips">
+        <div className="filtro-chips" data-filtro="base">
           <span>Base</span>
           <div>{BASES.map((b) => <button key={b} className={filtro.bases.includes(b) ? "on" : ""} onClick={() => setFiltro({ ...filtro, bases: alterna(filtro.bases, b) })}>{b}</button>)}</div>
         </div>
-        <div className="filtro-chips">
+        <div className="filtro-chips" data-filtro="coordenador">
           <span>Coordenador</span>
           <div>{COORDENADORES.map((c) => <button key={c} className={filtro.coordenadores.includes(c) ? "on" : ""} onClick={() => setFiltro({ ...filtro, coordenadores: alterna(filtro.coordenadores, c) })}>{c}</button>)}</div>
         </div>
-        <div className="filtro-chips">
+        <div className="filtro-chips" data-filtro="situacao">
           <span>Situação</span>
           <div>{situacoes.map((s) => <button key={s} className={filtro.situacoes.includes(s) ? "on" : ""} onClick={() => setFiltro({ ...filtro, situacoes: alterna(filtro.situacoes, s) })}>{s}</button>)}</div>
         </div>
         {filtro.pessoas.length > 0 && (
-          <div className="filtro-chips">
+          <div className="filtro-chips" data-filtro="colaborador">
             <span>Colaborador</span>
             <div>
               {filtro.pessoas.map((k) => {

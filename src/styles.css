@@ -895,3 +895,37 @@ em { font-style: normal; color: var(--vinho); }
 :root[data-tema="claro"] { color-scheme: light; }
 select option, select optgroup { background-color: var(--card); color: var(--ink-1, var(--texto)); }
 select option:checked { background-color: color-mix(in srgb, var(--serie) 28%, var(--card)); }
+
+/* ---------- filtros: cada grupo com borda, rótulo e cor próprios ---------- */
+.filtros-corpo { gap: 16px 10px; align-items: stretch; padding-top: 6px; }
+.filtro-grupo, .filtros-corpo > .filtro-chips {
+  --fc: #64748b; --fc-texto: #fff;
+  position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0;
+  padding: 13px 10px 8px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--fc) 50%, var(--hair));
+  background: color-mix(in srgb, var(--fc) 7%, transparent);
+}
+.filtro-grupo > .legenda, .filtros-corpo > .filtro-chips > span {
+  position: absolute; top: -8px; left: 10px; padding: 0 6px; line-height: 15px; border-radius: 4px;
+  background: var(--card); color: var(--fc); font-size: 10px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase;
+}
+:root[data-tema="escuro"] .filtro-grupo > .legenda, :root[data-tema="escuro"] .filtros-corpo > .filtro-chips > span { color: color-mix(in srgb, var(--fc) 62%, #fff); }
+.filtro-grupo label { display: flex; align-items: center; gap: 6px; }
+.filtro-grupo label > span { font-size: 10px; }
+.filtro-grupo select { border-color: color-mix(in srgb, var(--fc) 45%, var(--hair)); }
+
+.filtros-corpo > [data-filtro="periodo"] { --fc: #64748b; }
+.filtros-corpo > [data-filtro="gerencia"] { --fc: #2563eb; }
+.filtros-corpo > [data-filtro="base"] { --fc: #0d9488; }
+.filtros-corpo > [data-filtro="coordenador"] { --fc: #b45309; }
+.filtros-corpo > [data-filtro="situacao"] { --fc: #7c3aed; }
+.filtros-corpo > [data-filtro="colaborador"] { --fc: #db2777; }
+
+.filtros-corpo > .filtro-chips button:hover { background: color-mix(in srgb, var(--fc) 16%, transparent); color: var(--ink-1); }
+.filtros-corpo > .filtro-chips button.on { background: var(--fc); border-color: var(--fc); color: var(--fc-texto); }
+.filtros-corpo > .limpar { align-self: center; }
+@media (max-width: 640px) {
+  .filtro-grupo, .filtros-corpo > .filtro-chips { display: grid; }
+  .filtro-grupo { grid-template-columns: 1fr 1fr; }
+  .filtro-grupo > .legenda { grid-column: 1 / -1; }
+}
