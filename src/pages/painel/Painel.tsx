@@ -36,7 +36,21 @@ export default function Painel() {
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [filtro, setFiltro] = useState<Filtro>({ ...semFiltro });
   const [erro, setErro] = useState<string | null>(null);
-  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  // os filtros podem ser ocultados em qualquer tela; a escolha fica guardada (no celular começam ocultos)
+  const [filtrosAbertos, setFiltrosAbertos] = useState(() => {
+    try {
+      const g = localStorage.getItem("painel:filtros");
+      if (g) return g === "aberto";
+    } catch {}
+    return matchMedia("(min-width: 901px)").matches;
+  });
+  const alternarFiltros = () =>
+    setFiltrosAbertos((a) => {
+      try {
+        localStorage.setItem("painel:filtros", a ? "oculto" : "aberto");
+      } catch {}
+      return !a;
+    });
   const [recolhido, setRecolhido] = useState(() => {
     try {
       return localStorage.getItem("painel:menu") === "recolhido";
@@ -97,6 +111,7 @@ export default function Painel() {
   const anos = useMemo(() => anosDisponiveis(regs), [regs]);
   const situacoes = useMemo(() => [...new Set([...situacoesDisponiveis(regs), ...filtro.situacoes])], [regs, filtro.situacoes]);
   const filtrados = useMemo(() => filtrar(regs, filtro), [regs, filtro]);
+  const nAtivos = (filtro.ano != null ? 1 : 0) + (filtro.mes != null ? 1 : 0) + filtro.gerencias.length + filtro.bases.length + filtro.coordenadores.length + filtro.pessoas.length + filtro.situacoes.length;
   const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0 || filtro.pessoas.length > 0 || filtro.situacoes.length > 0;
 
   if (auth === "checando") return <div className="carregando">Carregando…</div>;
@@ -144,9 +159,9 @@ export default function Painel() {
 
       {!SO_ADMIN.includes(aba) && (
       <section className="filtros">
-        <button className="filtros-toggle" onClick={() => setFiltrosAbertos((a) => !a)} aria-expanded={filtrosAbertos}>
-          <span>Filtros{ativo ? " • ativos" : ""}</span>
-          <i>{filtrosAbertos ? "▲" : "▼"}</i>
+        <button className="filtros-toggle" onClick={alternarFiltros} aria-expanded={filtrosAbertos}>
+          <span>Filtros{nAtivos ? <b className="filtros-contagem">{nAtivos} ativo{nAtivos > 1 ? "s" : ""}</b> : null}</span>
+          <em>{filtrosAbertos ? "Ocultar" : "Mostrar"} <i>{filtrosAbertos ? "▲" : "▼"}</i></em>
         </button>
         <div className={`filtros-corpo ${filtrosAbertos ? "aberto" : ""}`}>
         <div className="filtro-grupo" data-filtro="periodo">

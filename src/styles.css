@@ -914,18 +914,22 @@ select option:checked { background-color: color-mix(in srgb, var(--serie) 28%, v
 .filtro-grupo label > span { font-size: 10px; }
 .filtro-grupo select { border-color: color-mix(in srgb, var(--fc) 45%, var(--hair)); }
 
-.filtros-corpo > [data-filtro="periodo"] { --fc: #64748b; }
-.filtros-corpo > [data-filtro="gerencia"] { --fc: #2563eb; }
-.filtros-corpo > [data-filtro="base"] { --fc: #0d9488; }
-.filtros-corpo > [data-filtro="coordenador"] { --fc: #b45309; }
-.filtros-corpo > [data-filtro="situacao"] { --fc: #7c3aed; }
-.filtros-corpo > [data-filtro="colaborador"] { --fc: #db2777; }
 
-.filtros-corpo > .filtro-chips button:hover { background: color-mix(in srgb, var(--fc) 16%, transparent); color: var(--ink-1); }
-.filtros-corpo > .filtro-chips button.on { background: var(--fc); border-color: var(--fc); color: var(--fc-texto); }
+.filtros-corpo > .filtro-chips button:hover { background: var(--grid); color: var(--ink-1); }
+.filtros-corpo > .filtro-chips button.on { background: var(--serie); border-color: var(--serie); color: #fff; }
 .filtros-corpo > .limpar { align-self: center; }
 @media (max-width: 640px) {
   .filtro-grupo, .filtros-corpo > .filtro-chips { display: grid; }
   .filtro-grupo { grid-template-columns: 1fr 1fr; }
   .filtro-grupo > .legenda { grid-column: 1 / -1; }
 }
+
+/* ---------- ocultar/mostrar filtros em qualquer tela ---------- */
+.filtros-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 0; background: none; border: 0; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-1); }
+.filtros-toggle span { display: inline-flex; align-items: center; gap: 8px; }
+.filtros-toggle em { font-style: normal; font-weight: 600; font-size: 12px; color: var(--ink-3); }
+.filtros-toggle:hover em { color: var(--ink-1); }
+.filtros-toggle i { font-style: normal; font-size: 10px; }
+.filtros-contagem { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; background: var(--serie); }
+.filtros-corpo { display: none; margin-top: 12px; }
+.filtros-corpo.aberto { display: flex; }
