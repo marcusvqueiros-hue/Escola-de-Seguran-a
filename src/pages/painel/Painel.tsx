@@ -19,7 +19,7 @@ const ABAS = [
   { id: "detalhamento", rotulo: "Detalhamento" },
   { id: "questoes", rotulo: "Questões", soAdmin: true },
   { id: "usuarios", rotulo: "Usuários", soAdmin: true },
-  { id: "configuracao", rotulo: "Configuração", soAdmin: true },
+  { id: "configuracao", rotulo: "Colaboradores", soAdmin: true },
 ] as const;
 const SO_ADMIN: string[] = ABAS.filter((a) => "soAdmin" in a).map((a) => a.id);
 type Aba = (typeof ABAS)[number]["id"];

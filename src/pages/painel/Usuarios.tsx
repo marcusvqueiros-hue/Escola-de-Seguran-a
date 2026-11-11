@@ -272,7 +272,7 @@ function FormUsuario({ inicial, eu, onSalvar, onFechar }: { inicial: Formulario;
           <span>Perfil de acesso</span>
           <select value={f.admin ? "admin" : "leitor"} onChange={(e) => set({ admin: e.target.value === "admin" })} disabled={euMesmo}>
             <option value="leitor">Somente relatórios (Escola de Segurança, Avaliação e Detalhamento)</option>
-            <option value="admin">Administrador (também Questões, Configuração e Usuários)</option>
+            <option value="admin">Administrador (também Questões, Usuários e Colaboradores)</option>
           </select>
         </label>
         <label className="q-check">
