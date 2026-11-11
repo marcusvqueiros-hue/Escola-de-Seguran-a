@@ -48,6 +48,7 @@ export interface Registro extends Identificacao {
   aprovado: boolean;
   horas: number;
   coordenador: string;
+  situacao: string; // situação do colaborador no cadastro (ATIVO, FÉRIAS...) ou SEM CADASTRO
   temFoto: boolean;
   local: string | null;
 }

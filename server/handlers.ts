@@ -104,7 +104,9 @@ async function finalizar(req: Request) {
 async function registros(): Promise<Registro[]> {
   const linhas = (await sql`SELECT * FROM escola_tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`) as any[];
   // coordenador: o do cadastro (pelo nome); sem cadastro, o da regra de gerência e base
-  const cadastro = new Map(((await sql`SELECT nome_norm, gerente FROM escola_colaboradores`) as { nome_norm: string; gerente: string | null }[]).map((c) => [c.nome_norm, c.gerente ?? ""]));
+  const cadastro = new Map(
+    ((await sql`SELECT nome_norm, gerente, situacao FROM escola_colaboradores`) as { nome_norm: string; gerente: string | null; situacao: string | null }[]).map((c) => [c.nome_norm, { gerente: c.gerente ?? "", situacao: c.situacao || "ATIVO" }]),
+  );
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]") as (Resposta | null)[];
     const questoes: number[] = l.questoes ? JSON.parse(l.questoes) : QUESTOES_ORIGINAIS;
@@ -127,7 +129,8 @@ async function registros(): Promise<Registro[]> {
       nota: total === 10 ? pontos : Math.round((pontos / total) * 1000) / 100,
       aprovado: pontos >= notaMinima(total),
       horas: HORAS_POR_PARTICIPACAO,
-      coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
+      coordenador: cadastro.get(chaveNome(l.nome))?.gerente || gerenteDe(l.gerencia, l.base),
+      situacao: cadastro.get(chaveNome(l.nome))?.situacao ?? "SEM CADASTRO",
       temFoto: l.tem_foto,
       local: l.local,
     };

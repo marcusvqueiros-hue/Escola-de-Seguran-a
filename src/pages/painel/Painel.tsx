@@ -11,7 +11,7 @@ import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaE
 import Configuracao from "./Configuracao";
 import Questoes from "./Questoes";
 import Usuarios from "./Usuarios";
-import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, type Filtro } from "./metrics";
+import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, situacoesDisponiveis, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
@@ -95,8 +95,9 @@ export default function Painel() {
   };
 
   const anos = useMemo(() => anosDisponiveis(regs), [regs]);
+  const situacoes = useMemo(() => [...new Set([...situacoesDisponiveis(regs), ...filtro.situacoes])], [regs, filtro.situacoes]);
   const filtrados = useMemo(() => filtrar(regs, filtro), [regs, filtro]);
-  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0 || filtro.pessoas.length > 0;
+  const ativo = filtro.ano != null || filtro.mes != null || filtro.gerencias.length > 0 || filtro.bases.length > 0 || filtro.coordenadores.length > 0 || filtro.pessoas.length > 0 || filtro.situacoes.length > 0;
 
   if (auth === "checando") return <div className="carregando">Carregando…</div>;
   if (auth === "nao") return <Login onEntrar={carregar} />;
@@ -173,6 +174,10 @@ export default function Painel() {
         <div className="filtro-chips">
           <span>Coordenador</span>
           <div>{COORDENADORES.map((c) => <button key={c} className={filtro.coordenadores.includes(c) ? "on" : ""} onClick={() => setFiltro({ ...filtro, coordenadores: alterna(filtro.coordenadores, c) })}>{c}</button>)}</div>
+        </div>
+        <div className="filtro-chips">
+          <span>Situação</span>
+          <div>{situacoes.map((s) => <button key={s} className={filtro.situacoes.includes(s) ? "on" : ""} onClick={() => setFiltro({ ...filtro, situacoes: alterna(filtro.situacoes, s) })}>{s}</button>)}</div>
         </div>
         {filtro.pessoas.length > 0 && (
           <div className="filtro-chips">

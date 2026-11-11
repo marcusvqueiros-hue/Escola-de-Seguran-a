@@ -29,7 +29,7 @@ type Modal =
 
 const VAZIO: Colab = { chapa: "", nome: "", funcao: "", base: "", gerencia: "", gerente: "", situacao: "ATIVO" };
 const POR_PAGINA = 50;
-const SITUACOES = ["ATIVO", "FÉRIAS", "AFASTADO"];
+const SITUACOES = ["ATIVO", "FÉRIAS", "AFASTADO", "DESLIGADO"];
 const COLUNAS_XLSX = ["CHAPA", "NOME", "FUNÇÃO", "BASE", "GERENCIA", "COORDENADOR", "SITUAÇÃO"];
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -196,7 +196,7 @@ export default function Configuracao() {
       <div className="kpis">
         <div className="kpi" style={{ ["--cor" as string]: "#84162b" }}><span>Colaboradores</span><strong>{lista.length}</strong></div>
         <div className="kpi" style={{ ["--cor" as string]: "#137e6a" }}><span>Ativos</span><strong>{ativos}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "#e0a526" }}><span>Férias / afastados</span><strong>{lista.length - ativos}</strong></div>
+        <div className="kpi" style={{ ["--cor" as string]: "#e0a526" }}><span>Férias / afastados</span><strong>{lista.filter((c) => c.situacao === "FÉRIAS" || c.situacao === "AFASTADO").length}</strong></div>
         <div className="kpi" style={{ ["--cor" as string]: "#1e90ff" }}><span>Coordenadores cadastrados</span><strong>{gerentes.length}</strong></div>
       </div>
 

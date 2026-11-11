@@ -10,8 +10,9 @@ export interface Filtro {
   bases: string[];
   coordenadores: string[];
   pessoas: string[]; // chaveNome dos colaboradores escolhidos num gráfico
+  situacoes: string[]; // situação do colaborador no cadastro
 }
-export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [], coordenadores: [], pessoas: [] };
+export const semFiltro: Filtro = { ano: null, mes: null, gerencias: [], bases: [], coordenadores: [], pessoas: [], situacoes: [] };
 
 export { chaveNome } from "../../shared/texto";
 import { chaveNome } from "../../shared/texto";
@@ -28,10 +29,20 @@ export function filtrar(regs: Registro[], f: Filtro) {
       (!f.gerencias.length || f.gerencias.includes(r.gerencia)) &&
       (!f.bases.length || f.bases.includes(r.base)) &&
       (!f.coordenadores.length || f.coordenadores.includes(r.coordenador)) &&
-      (!f.pessoas.length || f.pessoas.includes(chaveNome(r.nome)))
+      (!f.pessoas.length || f.pessoas.includes(chaveNome(r.nome))) &&
+      (!f.situacoes.length || f.situacoes.includes(r.situacao))
     );
   });
 }
+
+const ORDEM_SITUACAO = ["ATIVO", "FÉRIAS", "AFASTADO", "DESLIGADO"];
+
+/** Situações presentes nos registros, na ordem usual (as demais em ordem alfabética e SEM CADASTRO por último). */
+export const situacoesDisponiveis = (regs: Registro[]) =>
+  [...new Set(regs.map((r) => r.situacao))].sort((a, b) => {
+    const rank = (s: string) => (s === "SEM CADASTRO" ? 999 : ORDEM_SITUACAO.indexOf(s) >= 0 ? ORDEM_SITUACAO.indexOf(s) : 100);
+    return rank(a) - rank(b) || a.localeCompare(b);
+  });
 
 export const anosDisponiveis = (regs: Registro[]) => [...new Set(regs.map((r) => new Date(r.data).getFullYear()))].sort((a, b) => b - a);
 

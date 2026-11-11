@@ -6885,7 +6885,7 @@ async function finalizar(req) {
 }
 async function registros() {
   const linhas = await sql`SELECT * FROM escola_tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`;
-  const cadastro = new Map((await sql`SELECT nome_norm, gerente FROM escola_colaboradores`).map((c) => [c.nome_norm, c.gerente ?? ""]));
+  const cadastro = new Map((await sql`SELECT nome_norm, gerente, situacao FROM escola_colaboradores`).map((c) => [c.nome_norm, { gerente: c.gerente ?? "", situacao: c.situacao || "ATIVO" }]));
   return linhas.map((l) => {
     const respostas = JSON.parse(l.respostas ?? "[]");
     const questoes = l.questoes ? JSON.parse(l.questoes) : QUESTOES_ORIGINAIS;
@@ -6907,7 +6907,8 @@ async function registros() {
       nota: total === 10 ? pontos : Math.round(pontos / total * 1000) / 100,
       aprovado: pontos >= notaMinima(total),
       horas: HORAS_POR_PARTICIPACAO,
-      coordenador: cadastro.get(chaveNome(l.nome)) || gerenteDe(l.gerencia, l.base),
+      coordenador: cadastro.get(chaveNome(l.nome))?.gerente || gerenteDe(l.gerencia, l.base),
+      situacao: cadastro.get(chaveNome(l.nome))?.situacao ?? "SEM CADASTRO",
       temFoto: l.tem_foto,
       local: l.local
     };
