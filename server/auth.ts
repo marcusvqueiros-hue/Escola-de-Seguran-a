@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { sql } from "./db";
 
 const SESSAO_S = 12 * 60 * 60;
@@ -16,6 +16,18 @@ function igual(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+/** Senha guardada como scrypt$<sal>$<hash>; nunca em texto puro. */
+export function hashSenha(senha: string) {
+  const sal = randomBytes(16).toString("hex");
+  return ["scrypt", sal, scryptSync(senha, sal, 32).toString("hex")].join("$");
+}
+
+function confere(senha: string, guardado: string | undefined) {
+  const [, sal, hash] = (guardado ?? "scrypt$00$00").split("$");
+  const calc = scryptSync(senha, sal ?? "", 32).toString("hex");
+  return !!guardado && igual(calc, hash ?? "");
+}
+
 const assinar = (exp: string, segredo: string) => createHmac("sha256", segredo).update(exp).digest("hex");
 
 export async function tentarLogin(ip: string, usuario: string, senha: string): Promise<{ token?: string; erro?: string }> {
@@ -25,7 +37,11 @@ export async function tentarLogin(ip: string, usuario: string, senha: string): P
   const ativa = f && Number(f.ate) > agora;
   if (ativa && f!.n >= 5) return { erro: "Muitas tentativas. Aguarde alguns minutos." };
 
-  if (!(igual(usuario.trim(), c.usuario) && igual(senha, c.senha))) {
+  const chave = usuario.trim().toLowerCase();
+  const [u] = (await sql`SELECT senha_hash FROM escola_usuarios WHERE usuario_norm = ${chave} AND ativo`) as { senha_hash: string }[];
+  const valido = confere(senha, u?.senha_hash) || (igual(usuario.trim(), c.usuario) && igual(senha, c.senha));
+
+  if (!valido) {
     const n = (ativa ? f!.n : 0) + 1;
     await sql`INSERT INTO escola_falhas_login (ip, n, ate) VALUES (${ip}, ${n}, ${agora + 5 * 60 * 1000})
               ON CONFLICT (ip) DO UPDATE SET n = ${n}, ate = ${agora + 5 * 60 * 1000}`;

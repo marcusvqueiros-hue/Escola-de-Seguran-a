@@ -1,15 +1,13 @@
 // Uso: bun run colaboradores "<planilha>.xlsx"
 // Lê a aba "Base" (CHAPA, NOME, FUNÇÃO, BASE, PROCESSO, GERENCIA, SITUAÇÃO) e substitui o cadastro de colaboradores
-// no banco (DATABASE_URL, de .env.local). Quem aparece em mais de uma linha (vários processos) entra uma vez só.
+// no banco (SUPABASE_DB_URL ou DATABASE_URL). Quem aparece em mais de uma linha (vários processos) entra uma vez só.
 import * as XLSX from "xlsx";
-import { neon } from "@neondatabase/serverless";
+import { sql } from "../server/db";
 import { chaveNome } from "../src/shared/texto";
 import { BASES, GERENCIAS } from "../src/shared/constantes";
 
 const arquivo = process.argv[2];
 if (!arquivo) throw new Error('Informe a planilha: bun run colaboradores "arquivo.xlsx"');
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-if (!url) throw new Error("DATABASE_URL não encontrada (rode: vercel env pull .env.local).");
 
 const wb = XLSX.read(await Bun.file(arquivo).arrayBuffer());
 const aba = wb.Sheets["Base"] ?? wb.Sheets[wb.SheetNames[0]!]!;
@@ -33,7 +31,6 @@ const pessoas = [...porChapa.values()];
 const vistos = new Set<string>();
 const unicos = pessoas.filter((p) => (vistos.has(p.norm) ? (avisos.push(`nome repetido com outra chapa: ${p.chapa} ${p.nome}`), false) : (vistos.add(p.norm), true)));
 
-const sql = neon(url);
 await sql`ALTER TABLE escola_colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
 await sql.transaction([
   sql`DELETE FROM escola_colaboradores`,
@@ -46,3 +43,4 @@ await sql.transaction([
 const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_colaboradores`) as { n: number }[];
 console.log(`${linhas.length} linhas na planilha → ${unicos.length} colaboradores únicos; ${n} no banco.`);
 if (avisos.length) console.log(`Avisos (${avisos.length}):\n  ${avisos.slice(0, 15).join("\n  ")}`);
+process.exit(0);

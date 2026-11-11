@@ -56,3 +56,19 @@ ALTER TABLE escola_colaboradores ENABLE ROW LEVEL SECURITY;
 
 -- Depois de copiar dados com ids explicitos, alinha a sequencia (evita colisao em novos cadastros).
 SELECT setval(pg_get_serial_sequence('escola_colaboradores', 'id'), COALESCE((SELECT MAX(id) FROM escola_colaboradores), 1));
+
+-- Acesso ao painel de relatórios (senha só em hash scrypt; carga via scripts/importar-acessos.ts)
+CREATE TABLE IF NOT EXISTS escola_usuarios (
+  id           SERIAL PRIMARY KEY,
+  usuario      TEXT NOT NULL,
+  usuario_norm TEXT NOT NULL UNIQUE,
+  senha_hash   TEXT NOT NULL,
+  nome         TEXT,
+  chapa        TEXT,
+  funcao       TEXT,
+  base         TEXT,
+  gerencia     TEXT,
+  processo     TEXT,
+  ativo        BOOLEAN NOT NULL DEFAULT TRUE
+);
+ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY;

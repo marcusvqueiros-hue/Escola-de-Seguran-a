@@ -10,11 +10,10 @@
     "colaboradores": "bun scripts/importar-colaboradores.ts",
     "icones": "bun scripts/gerar-icones.ts",
     "importar": "bun scripts/importar-xlsx.ts",
-    "supabase:copiar": "bun scripts/copiar-para-supabase.ts",
+    "acessos": "bun scripts/importar-acessos.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1",
     "react": "^19.0.0",

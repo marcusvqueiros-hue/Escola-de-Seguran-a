@@ -6063,10 +6063,10 @@ var seed_default = [
   },
   {
     criadoEm: "2026-10-28T10:49:31-03:00",
-    prefixo: "Anajatuba",
+    prefixo: "MA-ANJ-E001M",
     matricula: "12787",
     nome: "NICODEMOS VIANA DOS SANTOS",
-    funcao: "",
+    funcao: "ELETRICISTA",
     base: "ITM",
     gerencia: "GSTC",
     respostas: [
@@ -6077,27 +6077,6 @@ var seed_default = [
       "A",
       "D",
       "B",
-      "C",
-      "B",
-      "C"
-    ]
-  },
-  {
-    criadoEm: "2026-10-28T11:04:53-03:00",
-    prefixo: "Anajatuba",
-    matricula: "12787",
-    nome: "NICODEMOS VIANA DOS SANTOS",
-    funcao: "",
-    base: "ITM",
-    gerencia: "GSTC",
-    respostas: [
-      "D",
-      "C",
-      "A",
-      "B",
-      "A",
-      "B",
-      "C",
       "C",
       "B",
       "C"
@@ -6176,6 +6155,21 @@ function iniciarBanco() {
     await sql`ALTER TABLE escola_colaboradores ADD COLUMN IF NOT EXISTS situacao TEXT`;
     await sql`ALTER TABLE escola_colaboradores ADD COLUMN IF NOT EXISTS gerente TEXT`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS escola_colaboradores_matricula_uq ON escola_colaboradores (matricula)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS escola_usuarios (
+        id           SERIAL PRIMARY KEY,
+        usuario      TEXT NOT NULL,
+        usuario_norm TEXT NOT NULL UNIQUE,
+        senha_hash   TEXT NOT NULL,
+        nome         TEXT,
+        chapa        TEXT,
+        funcao       TEXT,
+        base         TEXT,
+        gerencia     TEXT,
+        processo     TEXT,
+        ativo        BOOLEAN NOT NULL DEFAULT TRUE
+      )`;
+    await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM escola_tentativas WHERE origem = 'importado'`;
     if (n === 0) {
       await sql.transaction(seed_default.map((r, i) => sql`
@@ -6197,7 +6191,7 @@ function corrigir(respostas) {
 }
 
 // server/auth.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 var SESSAO_S = 12 * 60 * 60;
 function config() {
   const usuario = process.env.ADMIN_USER;
@@ -6211,6 +6205,11 @@ function igual(a, b) {
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
 }
+function confere(senha, guardado) {
+  const [, sal, hash] = (guardado ?? "scrypt$00$00").split("$");
+  const calc = scryptSync(senha, sal ?? "", 32).toString("hex");
+  return !!guardado && igual(calc, hash ?? "");
+}
 var assinar = (exp, segredo) => createHmac("sha256", segredo).update(exp).digest("hex");
 async function tentarLogin(ip, usuario, senha) {
   const c = config();
@@ -6219,7 +6218,10 @@ async function tentarLogin(ip, usuario, senha) {
   const ativa = f && Number(f.ate) > agora;
   if (ativa && f.n >= 5)
     return { erro: "Muitas tentativas. Aguarde alguns minutos." };
-  if (!(igual(usuario.trim(), c.usuario) && igual(senha, c.senha))) {
+  const chave = usuario.trim().toLowerCase();
+  const [u] = await sql`SELECT senha_hash FROM escola_usuarios WHERE usuario_norm = ${chave} AND ativo`;
+  const valido = confere(senha, u?.senha_hash) || igual(usuario.trim(), c.usuario) && igual(senha, c.senha);
+  if (!valido) {
     const n = (ativa ? f.n : 0) + 1;
     await sql`INSERT INTO escola_falhas_login (ip, n, ate) VALUES (${ip}, ${n}, ${agora + 5 * 60 * 1000})
               ON CONFLICT (ip) DO UPDATE SET n = ${n}, ate = ${agora + 5 * 60 * 1000}`;

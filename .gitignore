@@ -9,3 +9,7 @@ dist
 .agents
 .claude/skills
 skills-lock.json
+
+# planilhas com dados pessoais e senhas
+*.xlsx
+*.xls

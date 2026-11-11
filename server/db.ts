@@ -80,6 +80,22 @@ export function iniciarBanco() {
     await sql`ALTER TABLE escola_colaboradores ADD COLUMN IF NOT EXISTS gerente TEXT`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS escola_colaboradores_matricula_uq ON escola_colaboradores (matricula)`;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS escola_usuarios (
+        id           SERIAL PRIMARY KEY,
+        usuario      TEXT NOT NULL,
+        usuario_norm TEXT NOT NULL UNIQUE,
+        senha_hash   TEXT NOT NULL,
+        nome         TEXT,
+        chapa        TEXT,
+        funcao       TEXT,
+        base         TEXT,
+        gerencia     TEXT,
+        processo     TEXT,
+        ativo        BOOLEAN NOT NULL DEFAULT TRUE
+      )`;
+    await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
+
     const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_tentativas WHERE origem = 'importado'`) as { n: number }[];
     if (n === 0) {
       await sql.transaction(
