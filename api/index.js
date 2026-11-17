@@ -6743,6 +6743,44 @@ async function rotasRespostas(req, rota) {
   return null;
 }
 
+// server/mapa.ts
+var json4 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+async function rotasMapa(req, rota) {
+  if (rota !== "/api/admin/mapa-calor" || req.method !== "GET")
+    return null;
+  const participantes = new Map;
+  for (const r of await registros()) {
+    const k = chaveNome(r.nome);
+    const p = participantes.get(k) ?? { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, situacao: r.situacao, ultima: "", participacoes: [], notificacoes: [] };
+    p.participacoes.push(r.data);
+    if (!p.ultima || Date.parse(r.data) >= Date.parse(p.ultima))
+      Object.assign(p, { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, situacao: r.situacao, ultima: r.data });
+    participantes.set(k, p);
+  }
+  let fonte = { notificacoes: 0, de: null, ate: null, disponivel: true };
+  try {
+    const notif = await sql`SELECT data::text AS data, base, gerencia, status, eletricistas FROM notificacoes WHERE data IS NOT NULL`;
+    let de = null;
+    let ate = null;
+    for (const n of notif) {
+      if (!de || n.data < de)
+        de = n.data;
+      if (!ate || n.data > ate)
+        ate = n.data;
+      for (const k of new Set((n.eletricistas ?? []).map((e) => chaveNome(String(e))))) {
+        participantes.get(k)?.notificacoes.push({ data: n.data, base: n.base ?? "", gerencia: n.gerencia ?? "", status: n.status ?? "" });
+      }
+    }
+    fonte = { notificacoes: notif.length, de, ate, disponivel: true };
+  } catch (e) {
+    if (e?.code !== "42P01")
+      throw e;
+    fonte = { notificacoes: 0, de: null, ate: null, disponivel: false };
+  }
+  const lista = [...participantes.values()].map(({ ultima: _, ...p }) => ({ ...p, participacoes: p.participacoes.sort(), notificacoes: p.notificacoes.sort((a, b) => a.data.localeCompare(b.data)) })).sort((a, b) => a.nome.localeCompare(b.nome));
+  return json4({ participantes: lista, fonte });
+}
+
 // server/gerentes.ts
 async function aplicarRegraGerentes(somenteVazios) {
   const linhas = REGRAS_COORDENADORES.flatMap((r) => (r.bases ?? ["*"]).map((b) => ({ gerencia: r.gerencia, base: b, gerente: r.gerente })));
@@ -6756,8 +6794,8 @@ async function aplicarRegraGerentes(somenteVazios) {
 }
 
 // server/colaboradores.ts
-var json4 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-var erro4 = (msg, status = 400) => json4({ erro: msg }, status);
+var json5 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+var erro4 = (msg, status = 400) => json5({ erro: msg }, status);
 var txt = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 function limpar(b) {
   return {
@@ -6869,7 +6907,7 @@ async function importar(b) {
       await sql.transaction(ops);
   }
   const amostra = (xs) => xs.slice(0, 60);
-  return json4({
+  return json5({
     aplicado: aplicar,
     resumo: { lidos: entrada.length, novos: novos.length, alterados: alterados.length, removidos: removidos.length, invalidos: invalidos.length, semMudanca: novoSet.length - novos.length - alterados.length },
     novos: amostra(novos.map((c) => ({ chapa: c.chapa, nome: c.nome, base: c.base, gerencia: c.gerencia }))),
@@ -6882,7 +6920,7 @@ async function rotasColaboradores(req, rota) {
   if (rota === "/api/admin/colaboradores") {
     if (req.method === "GET") {
       const rs = await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM escola_colaboradores ORDER BY nome_norm`;
-      return json4({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
+      return json5({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
     }
     if (req.method === "POST") {
       const c = limpar(await req.json().catch(() => null));
@@ -6896,12 +6934,12 @@ async function rotasColaboradores(req, rota) {
         return erro4("Já existe colaborador com essa chapa ou esse nome.", 409);
       const [novo] = await sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
         VALUES (${c.nome}, ${chaveNome(c.nome)}, ${c.chapa}, '', ${c.funcao}, ${c.base}, ${c.gerencia}, ${c.gerente}, ${c.situacao}) RETURNING id`;
-      return json4({ ok: true, id: novo.id }, 201);
+      return json5({ ok: true, id: novo.id }, 201);
     }
   }
   if (rota === "/api/admin/colaboradores/gerentes" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
-    return json4({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
+    return json5({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
   }
   if (rota === "/api/admin/colaboradores/importar" && req.method === "POST")
     return importar(await req.json().catch(() => null));
@@ -6919,19 +6957,19 @@ async function rotasColaboradores(req, rota) {
         return erro4("Outro colaborador já usa essa chapa ou esse nome.", 409);
       const r = await sql`UPDATE escola_colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
         base = ${c.base}, gerencia = ${c.gerencia}, gerente = ${c.gerente}, situacao = ${c.situacao} WHERE id = ${id} RETURNING id`;
-      return r.length ? json4({ ok: true }) : erro4("Colaborador não encontrado.", 404);
+      return r.length ? json5({ ok: true }) : erro4("Colaborador não encontrado.", 404);
     }
     if (req.method === "DELETE") {
       const r = await sql`DELETE FROM escola_colaboradores WHERE id = ${id} RETURNING id`;
-      return r.length ? json4({ ok: true }) : erro4("Colaborador não encontrado.", 404);
+      return r.length ? json5({ ok: true }) : erro4("Colaborador não encontrado.", 404);
     }
   }
   return null;
 }
 
 // server/handlers.ts
-var json5 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
-var erro5 = (msg, status = 400) => json5({ erro: msg }, status);
+var json6 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
+var erro5 = (msg, status = 400) => json6({ erro: msg }, status);
 var limpa4 = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 var LETRAS_ARR = ["A", "B", "C", "D"];
 var LETRAS3 = new Set(LETRAS_ARR);
@@ -6961,7 +6999,7 @@ async function iniciar(req) {
   await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia, questoes)
             VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia}, ${JSON.stringify(ativas.map((q) => q.id))})`;
   const questoes = ativas.map((q) => ({ id: q.id, enunciado: q.enunciado, opcoes: q.opcoes.map((texto, i) => ({ letra: LETRAS_ARR[i], texto })) }));
-  return json5({ id, duracaoSeg: DURACAO_SEG, questoes });
+  return json6({ id, duracaoSeg: DURACAO_SEG, questoes });
 }
 async function finalizar(req) {
   const b = await req.json().catch(() => null);
@@ -7003,7 +7041,7 @@ async function finalizar(req) {
   ]);
   await sql`UPDATE escola_colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
   const nota = acertos.filter(Boolean).length;
-  return json5({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
+  return json6({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
 }
 async function api(req) {
   const { pathname } = new URL(req.url);
@@ -7014,22 +7052,22 @@ async function api(req) {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
       const digitos = /^\d+$/.test(q);
       if (q.length < 2)
-        return json5({ resultados: [] });
+        return json6({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
       const rs = digitos ? await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8` : await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE nome_norm LIKE ${padrao}
                     ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
-      return json5({ resultados: rs });
+      return json6({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
     if (colab && req.method === "GET") {
       const [c] = await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM escola_colaboradores WHERE id = ${Number(colab)}`;
-      return c ? json5(c) : erro5("Colaborador não encontrado.", 404);
+      return c ? json6(c) : erro5("Colaborador não encontrado.", 404);
     }
     if (rota === "/api/avaliacao/info" && req.method === "GET") {
       const total = (await questoesAtivas()).length;
-      return json5({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
+      return json6({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
     }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST")
       return await iniciar(req);
@@ -7040,17 +7078,17 @@ async function api(req) {
       const r = await tentarLogin(ipDe(req), String(b.usuario ?? ""), String(b.senha ?? ""));
       if (!r.token)
         return erro5(r.erro ?? "Falha no login.", 401);
-      return json5({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
+      return json6({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
     }
     if (rota === "/api/admin/logout" && req.method === "POST")
-      return json5({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
+      return json6({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
     if (rota === "/api/admin/sessao")
-      return json5({ autenticado: !!await sessaoDe(req) });
+      return json6({ autenticado: !!await sessaoDe(req) });
     if (rota.startsWith("/api/admin/")) {
       const eu = await sessaoDe(req);
       if (!eu)
         return erro5("Não autorizado.", 401);
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas)(\/|$)/.test(rota) && !eu.admin)
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor)(\/|$)/.test(rota) && !eu.admin)
         return erro5("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr)
@@ -7058,6 +7096,9 @@ async function api(req) {
       const resp = await rotasRespostas(req, rota);
       if (resp)
         return resp;
+      const mapa = await rotasMapa(req, rota);
+      if (mapa)
+        return mapa;
       const colab = await rotasColaboradores(req, rota);
       if (colab)
         return colab;
@@ -7066,7 +7107,7 @@ async function api(req) {
         return quest;
       if (rota === "/api/admin/registros") {
         const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
-        return json5({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
+        return json6({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
       }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {

@@ -5,6 +5,7 @@ import { listarQuestoes, questoesAtivas, rotasQuestoes } from "./questoes";
 import { cookieLimpo, cookieSessao, sessaoDe, tentarLogin } from "./auth";
 import { rotasUsuarios } from "./usuarios";
 import { rotasRespostas } from "./respostas";
+import { rotasMapa } from "./mapa";
 import { registros } from "./registros";
 import {
   BASES,
@@ -147,11 +148,13 @@ export async function api(req: Request): Promise<Response> {
       const eu = await sessaoDe(req);
       if (!eu) return erro("Não autorizado.", 401);
       // relatórios (registros e fotos) para qualquer usuário; o restante só para administradores
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr) return usr;
       const resp = await rotasRespostas(req, rota);
       if (resp) return resp;
+      const mapa = await rotasMapa(req, rota);
+      if (mapa) return mapa;
       const colab = await rotasColaboradores(req, rota);
       if (colab) return colab;
       const quest = await rotasQuestoes(req, rota);

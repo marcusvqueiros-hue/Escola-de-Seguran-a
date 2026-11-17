@@ -11,6 +11,7 @@ import { KpisAvaliacao, KpisEscola, PaginaAvaliacao, PaginaDetalhamento, PaginaE
 import Configuracao from "./Configuracao";
 import Questoes from "./Questoes";
 import Respostas from "./Respostas";
+import MapaCalor from "./MapaCalor";
 import Usuarios from "./Usuarios";
 import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, situacoesDisponiveis, type Filtro } from "./metrics";
 
@@ -18,6 +19,7 @@ const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
   { id: "avaliacao", rotulo: "Avaliação" },
   { id: "detalhamento", rotulo: "Detalhamento" },
+  { id: "mapa", rotulo: "Mapa de calor", soAdmin: true },
   { id: "respostas", rotulo: "Respostas", soAdmin: true },
   { id: "questoes", rotulo: "Questões", soAdmin: true },
   { id: "usuarios", rotulo: "Usuários", soAdmin: true },
@@ -225,6 +227,7 @@ export default function Painel() {
         {aba === "escola" && <PaginaEscola todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "avaliacao" && <PaginaAvaliacao todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} questoesLista={questoesLista} />}
+        {aba === "mapa" && eu?.admin && <MapaCalor />}
         {aba === "respostas" && eu?.admin && <Respostas onAlterou={carregar} />}
         {aba === "questoes" && eu?.admin && <Questoes onAlterou={carregar} />}
         {aba === "usuarios" && eu?.admin && <Usuarios eu={eu} />}

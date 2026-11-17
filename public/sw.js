@@ -2,7 +2,7 @@
 // - /api/* nunca passa pelo cache (dados sempre ao vivo, nada sensível guardado);
 // - páginas: rede primeiro, com a última cópia do app como reserva offline;
 // - arquivos estáticos (JS/CSS/imagens com hash no nome): cache primeiro.
-const VERSAO = "v33";
+const VERSAO = "v34";
 const CACHE = `escola-${VERSAO}`;
 const PRE = ["/", "/icons/icon-192.png", "/manifest.webmanifest"];
 
