@@ -139,8 +139,12 @@ export function iniciarBanco() {
       );
     }
 
+    await sql`CREATE TABLE IF NOT EXISTS escola_meta (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)`;
+    await sql`ALTER TABLE escola_meta ENABLE ROW LEVEL SECURITY`;
+    const [semente] = (await sql`SELECT valor FROM escola_meta WHERE chave = 'carga_forms'`) as { valor: string }[];
     const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_tentativas WHERE origem = 'importado'`) as { n: number }[];
-    if (n === 0) {
+    if (!semente) await sql`INSERT INTO escola_meta (chave, valor) VALUES ('carga_forms', '1') ON CONFLICT (chave) DO NOTHING`;
+    if (n === 0 && !semente) {
       await sql.transaction(
         (seed as any[]).map(
           (r, i) => sql`

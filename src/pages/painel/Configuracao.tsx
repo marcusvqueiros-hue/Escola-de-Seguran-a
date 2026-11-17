@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { chaveNome } from "../../shared/texto";
 
 interface Colab {
@@ -358,7 +359,8 @@ export function Janela({ titulo, largo, onFechar, children }: { titulo: string; 
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
   }, [onFechar]);
-  return (
+  // no body: o conteúdo da página tem animação com transform, o que prenderia o "fixed" à página inteira
+  return createPortal(
     <div className="modal-fundo" onMouseDown={(e) => e.target === e.currentTarget && onFechar()}>
       <div className={`modal ${largo ? "largo" : ""}`} role="dialog" aria-modal="true" aria-label={titulo}>
         <header>
@@ -367,7 +369,8 @@ export function Janela({ titulo, largo, onFechar, children }: { titulo: string; 
         </header>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

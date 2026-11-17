@@ -89,3 +89,7 @@ ALTER TABLE escola_tentativas ADD COLUMN IF NOT EXISTS acertos TEXT;
 
 -- Perfil de acesso ao painel: admin = TRUE vê também Questões, Usuários e Configuração (gerenciado na aba Usuários).
 ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Marca que a carga inicial do Forms já foi feita (apagar registros importados na aba Respostas não os traz de volta).
+CREATE TABLE IF NOT EXISTS escola_meta (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
+ALTER TABLE escola_meta ENABLE ROW LEVEL SECURITY;

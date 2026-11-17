@@ -4,6 +4,8 @@ import { GABARITO } from "./gabarito";
 import { listarQuestoes, questoesAtivas, rotasQuestoes } from "./questoes";
 import { cookieLimpo, cookieSessao, sessaoDe, tentarLogin } from "./auth";
 import { rotasUsuarios } from "./usuarios";
+import { rotasRespostas } from "./respostas";
+import { registros } from "./registros";
 import {
   BASES,
   DURACAO_SEG,
@@ -101,42 +103,6 @@ async function finalizar(req: Request) {
   return json({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
 }
 
-async function registros(): Promise<Registro[]> {
-  const linhas = (await sql`SELECT * FROM escola_tentativas WHERE finalizada_em IS NOT NULL ORDER BY finalizada_em`) as any[];
-  // coordenador: o do cadastro (pelo nome); sem cadastro, o da regra de gerência e base
-  const cadastro = new Map(
-    ((await sql`SELECT nome_norm, gerente, situacao FROM escola_colaboradores`) as { nome_norm: string; gerente: string | null; situacao: string | null }[]).map((c) => [c.nome_norm, { gerente: c.gerente ?? "", situacao: c.situacao || "ATIVO" }]),
-  );
-  return linhas.map((l) => {
-    const respostas = JSON.parse(l.respostas ?? "[]") as (Resposta | null)[];
-    const questoes: number[] = l.questoes ? JSON.parse(l.questoes) : QUESTOES_ORIGINAIS;
-    const acertos: boolean[] = l.acertos ? JSON.parse(l.acertos) : GABARITO.map((g, i) => respostas[i] === g);
-    const pontos = acertos.filter(Boolean).length;
-    const total = acertos.length || 1;
-    return {
-      id: l.id,
-      data: l.finalizada_em,
-      nome: l.nome,
-      matricula: l.matricula,
-      prefixo: l.prefixo,
-      funcao: l.funcao,
-      base: l.base,
-      gerencia: l.gerencia,
-      questoes,
-      respostas,
-      acertos,
-      // nota de 0 a 10, qualquer que seja o número de questões da época
-      nota: total === 10 ? pontos : Math.round((pontos / total) * 1000) / 100,
-      aprovado: pontos >= notaMinima(total),
-      horas: HORAS_POR_PARTICIPACAO,
-      coordenador: cadastro.get(chaveNome(l.nome))?.gerente || gerenteDe(l.gerencia, l.base),
-      situacao: cadastro.get(chaveNome(l.nome))?.situacao ?? "SEM CADASTRO",
-      temFoto: l.tem_foto,
-      local: l.local,
-    };
-  });
-}
-
 export async function api(req: Request): Promise<Response> {
   const { pathname } = new URL(req.url);
   const rota = pathname.replace(/\/+$/, "");
@@ -181,9 +147,11 @@ export async function api(req: Request): Promise<Response> {
       const eu = await sessaoDe(req);
       if (!eu) return erro("Não autorizado.", 401);
       // relatórios (registros e fotos) para qualquer usuário; o restante só para administradores
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr) return usr;
+      const resp = await rotasRespostas(req, rota);
+      if (resp) return resp;
       const colab = await rotasColaboradores(req, rota);
       if (colab) return colab;
       const quest = await rotasQuestoes(req, rota);
