@@ -7,8 +7,13 @@ const erro = (msg: string, status = 400) => json({ erro: msg }, status);
 const limpa = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 async function listar() {
-  const rs = (await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha FROM escola_usuarios ORDER BY nome, usuario`) as any[];
-  return rs.map(({ trocar_senha, ...u }) => ({ ...u, trocarSenha: !!trocar_senha, desenvolvedor: ehDesenvolvedor(u.usuario) }));
+  const rs = (await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha, ultimo_acesso FROM escola_usuarios ORDER BY nome, usuario`) as any[];
+  return rs.map(({ trocar_senha, ultimo_acesso, ...u }) => ({
+    ...u,
+    trocarSenha: !!trocar_senha,
+    ultimoAcesso: ultimo_acesso ? new Date(ultimo_acesso).toISOString() : null,
+    desenvolvedor: ehDesenvolvedor(u.usuario),
+  }));
 }
 
 const nomeAcesso = (v: unknown) => {

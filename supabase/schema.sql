@@ -96,3 +96,6 @@ ALTER TABLE escola_meta ENABLE ROW LEVEL SECURITY;
 
 -- Senha provisória: o usuário só consegue definir a nova senha antes de acessar os relatórios.
 ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS trocar_senha BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Horário do último login de cada usuário (mostrado na aba Usuários).
+ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS ultimo_acesso TIMESTAMPTZ;

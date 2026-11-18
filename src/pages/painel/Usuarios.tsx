@@ -15,6 +15,7 @@ interface Usuario {
   ativo: boolean;
   desenvolvedor: boolean;
   trocarSenha: boolean;
+  ultimoAcesso: string | null; // ISO
 }
 
 interface Formulario {
@@ -29,6 +30,8 @@ interface Formulario {
   ativo: boolean;
   senha: string;
 }
+
+const dataHora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 const VAZIO: Formulario = { usuario: "@", nome: "", chapa: "", funcao: "", base: "", gerencia: "", admin: false, ativo: true, senha: "" };
 
@@ -170,7 +173,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
         <div className="tabela-wrap">
           <table className="tabela">
             <thead>
-              <tr><th>Nome</th><th>Usuário</th><th>Chapa</th><th>Função</th><th>Base</th><th>Gerência</th><th>Perfil</th><th>Situação</th><th aria-label="Ações" /></tr>
+              <tr><th>Nome</th><th>Usuário</th><th>Chapa</th><th>Função</th><th>Base</th><th>Gerência</th><th>Perfil</th><th>Último acesso</th><th>Situação</th><th aria-label="Ações" /></tr>
             </thead>
             <tbody>
               {filtrados.map((u) => (
@@ -184,6 +187,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
                   <td data-rotulo="Perfil">
                     <span className={`selo-sit ${u.admin ? "ok" : ""}`}>{u.desenvolvedor ? "Desenvolvedor" : u.admin ? "Administrador" : "Relatórios"}</span>
                   </td>
+                  <td data-rotulo="Último acesso" className="ult-acesso">{u.ultimoAcesso ? dataHora(u.ultimoAcesso) : <span className="nunca">Nunca acessou</span>}</td>
                   <td data-rotulo="Situação">
                     <div className="sit-selos">
                       <span className={`selo-sit ${u.ativo ? "ok" : ""}`}>{u.ativo ? "Ativo" : "Desativado"}</span>
@@ -197,7 +201,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
                   </td>
                 </tr>
               ))}
-              {!filtrados.length && <tr><td colSpan={9} className="vazio-tab">{carregando ? "Carregando…" : "Nenhum usuário encontrado."}</td></tr>}
+              {!filtrados.length && <tr><td colSpan={10} className="vazio-tab">{carregando ? "Carregando…" : "Nenhum usuário encontrado."}</td></tr>}
             </tbody>
           </table>
         </div>

@@ -6240,6 +6240,7 @@ function iniciarBanco() {
     await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
     await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE`;
     await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS trocar_senha BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS ultimo_acesso TIMESTAMPTZ`;
     await sql`
       CREATE TABLE IF NOT EXISTS escola_questoes (
         id        SERIAL PRIMARY KEY,
@@ -6441,6 +6442,7 @@ async function tentarLogin(ip, usuario, senha) {
     return { erro: "Usuário ou senha inválidos." };
   }
   await sql`DELETE FROM escola_falhas_login WHERE ip = ${ip}`;
+  await sql`UPDATE escola_usuarios SET ultimo_acesso = now() WHERE usuario_norm = ${chave}`;
   return { token: emitir(chave, c.segredo, agora) };
 }
 async function sessaoDe(req) {
@@ -6504,8 +6506,13 @@ var json2 = (data, status = 200) => Response.json(data, { status, headers: { "Ca
 var erro2 = (msg, status = 400) => json2({ erro: msg }, status);
 var limpa2 = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 async function listar() {
-  const rs = await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha FROM escola_usuarios ORDER BY nome, usuario`;
-  return rs.map(({ trocar_senha, ...u }) => ({ ...u, trocarSenha: !!trocar_senha, desenvolvedor: ehDesenvolvedor(u.usuario) }));
+  const rs = await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha, ultimo_acesso FROM escola_usuarios ORDER BY nome, usuario`;
+  return rs.map(({ trocar_senha, ultimo_acesso, ...u }) => ({
+    ...u,
+    trocarSenha: !!trocar_senha,
+    ultimoAcesso: ultimo_acesso ? new Date(ultimo_acesso).toISOString() : null,
+    desenvolvedor: ehDesenvolvedor(u.usuario)
+  }));
 }
 var nomeAcesso = (v) => {
   const s = limpa2(v, 40).replace(/\s/g, "");

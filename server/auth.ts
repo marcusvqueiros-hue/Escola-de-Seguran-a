@@ -58,6 +58,8 @@ export async function tentarLogin(ip: string, usuario: string, senha: string): P
     return { erro: "Usuário ou senha inválidos." };
   }
   await sql`DELETE FROM escola_falhas_login WHERE ip = ${ip}`;
+  // registra o horário do acesso (aparece na aba Usuários)
+  await sql`UPDATE escola_usuarios SET ultimo_acesso = now() WHERE usuario_norm = ${chave}`;
   return { token: emitir(chave, c.segredo, agora) };
 }
 
