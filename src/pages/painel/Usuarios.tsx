@@ -54,6 +54,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
   const [busca, setBusca] = useState("");
   const [fPerfil, setFPerfil] = useState("");
   const [fSituacao, setFSituacao] = useState("");
+  const [fAcesso, setFAcesso] = useState(""); // "sim" = já acessaram, "nao" = nunca acessaram
   const [modal, setModal] = useState<{ tipo: "form"; dados: Formulario } | { tipo: "excluir"; u: Usuario } | null>(null);
 
   const carregar = useCallback(async () => {
@@ -78,9 +79,11 @@ export default function Usuarios({ eu }: { eu: Eu }) {
       (u) =>
         (!q || `${u.nome} ${u.usuario} ${u.chapa}`.toLowerCase().includes(q)) &&
         (!fPerfil || (fPerfil === "admin" ? u.admin : !u.admin)) &&
-        (!fSituacao || (fSituacao === "ativo" ? u.ativo : !u.ativo)),
+        (!fSituacao || (fSituacao === "ativo" ? u.ativo : !u.ativo)) &&
+        (!fAcesso || (fAcesso === "sim" ? !!u.ultimoAcesso : !u.ultimoAcesso)),
     );
-  }, [lista, busca, fPerfil, fSituacao]);
+  }, [lista, busca, fPerfil, fSituacao, fAcesso]);
+  const jaAcessaram = lista.filter((u) => u.ultimoAcesso).length;
 
   const admins = lista.filter((u) => u.admin).length;
   const inativos = lista.filter((u) => !u.ativo).length;
@@ -122,7 +125,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
     <div className="usuarios">
       <div className="kpis">
         {CARDS.map((c) => {
-          const ativo = (c.perfil ?? "") === fPerfil && (c.situacao ?? "") === fSituacao;
+          const ativo = (c.perfil ?? "") === fPerfil && (c.situacao ?? "") === fSituacao && !fAcesso;
           return (
             <button
               key={c.rotulo}
@@ -136,6 +139,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
                 const limpa = ativo || (!c.perfil && !c.situacao);
                 setFPerfil(limpa ? "" : (c.perfil ?? ""));
                 setFSituacao(limpa ? "" : (c.situacao ?? ""));
+                setFAcesso("");
               }}
             >
               <span>{c.rotulo}</span>
@@ -158,7 +162,12 @@ export default function Usuarios({ eu }: { eu: Eu }) {
             <option value="ativo">Ativos</option>
             <option value="inativo">Desativados</option>
           </select>
-          {(busca || fPerfil || fSituacao) && <button className="limpar" onClick={() => { setBusca(""); setFPerfil(""); setFSituacao(""); }}>Limpar</button>}
+          <select value={fAcesso} onChange={(e) => setFAcesso(e.target.value)} aria-label="Acesso">
+            <option value="">Todos (acessou ou não)</option>
+            <option value="sim">Já acessaram ({jaAcessaram})</option>
+            <option value="nao">Nunca acessaram ({lista.length - jaAcessaram})</option>
+          </select>
+          {(busca || fPerfil || fSituacao || fAcesso) && <button className="limpar" onClick={() => { setBusca(""); setFPerfil(""); setFSituacao(""); setFAcesso(""); }}>Limpar</button>}
         </div>
 
         <div className="barra-acoes acoes-topo">
