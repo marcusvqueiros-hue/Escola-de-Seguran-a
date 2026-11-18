@@ -159,7 +159,12 @@ export default function Usuarios({ eu }: { eu: Eu }) {
                   <td data-rotulo="Perfil">
                     <span className={`selo-sit ${u.admin ? "ok" : ""}`}>{u.desenvolvedor ? "Desenvolvedor" : u.admin ? "Administrador" : "Relatórios"}</span>
                   </td>
-                  <td data-rotulo="Situação"><span className={`selo-sit ${u.ativo ? "ok" : ""}`}>{u.ativo ? "Ativo" : "Desativado"}</span>{u.trocarSenha && <span className="selo-sit prov" title="A pessoa ainda precisa definir a própria senha no primeiro acesso">Senha provisória</span>}</td>
+                  <td data-rotulo="Situação">
+                    <div className="sit-selos">
+                      <span className={`selo-sit ${u.ativo ? "ok" : ""}`}>{u.ativo ? "Ativo" : "Desativado"}</span>
+                      {u.trocarSenha && <span className="selo-sit prov" title="A pessoa ainda precisa definir a própria senha no primeiro acesso">Senha provisória</span>}
+                    </div>
+                  </td>
                   <td className="acoes-linha">
                     <button title="Editar" aria-label={`Editar ${u.nome}`} onClick={() => setModal({ tipo: "form", dados: { id: u.id, usuario: u.usuario, nome: u.nome, chapa: u.chapa, funcao: u.funcao, base: u.base, gerencia: u.gerencia, admin: u.admin, ativo: u.ativo, senha: "" } })}>✎</button>
                     <button title={u.ativo ? "Desativar acesso" : "Reativar acesso"} aria-label={`${u.ativo ? "Desativar" : "Reativar"} ${u.nome}`} disabled={proprio(u) || u.desenvolvedor} onClick={() => alternarAtivo(u)}>{u.ativo ? "⏸" : "▶"}</button>
