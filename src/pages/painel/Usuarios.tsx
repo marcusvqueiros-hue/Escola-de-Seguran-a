@@ -108,13 +108,38 @@ export default function Usuarios({ eu }: { eu: Eu }) {
     await carregar();
   }
 
+  const CARDS = [
+    { rotulo: "Usuários", valor: lista.length, cor: "var(--serie)" },
+    { rotulo: "Administradores", valor: admins, cor: "var(--good)", perfil: "admin" },
+    { rotulo: "Somente relatórios", valor: lista.length - admins, cor: "var(--info)", perfil: "leitor" },
+    { rotulo: "Desativados", valor: inativos, cor: "var(--neutro)", situacao: "inativo" },
+  ] as { rotulo: string; valor: number; cor: string; perfil?: string; situacao?: string }[];
+
   return (
     <div className="usuarios">
       <div className="kpis">
-        <div className="kpi" style={{ ["--cor" as string]: "var(--serie)" }}><span>Usuários</span><strong>{lista.length}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--good)" }}><span>Administradores</span><strong>{admins}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--info)" }}><span>Somente relatórios</span><strong>{lista.length - admins}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--neutro)" }}><span>Desativados</span><strong>{inativos}</strong></div>
+        {CARDS.map((c) => {
+          const ativo = (c.perfil ?? "") === fPerfil && (c.situacao ?? "") === fSituacao;
+          return (
+            <button
+              key={c.rotulo}
+              type="button"
+              className={`kpi clicavel ${ativo ? "on" : ""}`}
+              style={{ ["--cor" as string]: c.cor }}
+              aria-pressed={ativo}
+              title={ativo && (c.perfil || c.situacao) ? "Clique para limpar o filtro" : `Filtrar: ${c.rotulo}`}
+              onClick={() => {
+                // clicar de novo no card ativo (ou em "Usuários") volta para todos
+                const limpa = ativo || (!c.perfil && !c.situacao);
+                setFPerfil(limpa ? "" : (c.perfil ?? ""));
+                setFSituacao(limpa ? "" : (c.situacao ?? ""));
+              }}
+            >
+              <span>{c.rotulo}</span>
+              <strong>{c.valor}</strong>
+            </button>
+          );
+        })}
       </div>
 
       <section className="card tabela-card">

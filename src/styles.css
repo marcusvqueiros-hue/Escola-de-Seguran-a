@@ -1034,3 +1034,9 @@ select option:checked { background-color: color-mix(in srgb, var(--serie) 28%, v
 .selo-sit { white-space: nowrap; }
 .sit-selos { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .selo-sit.prov { margin-left: 0; }
+
+/* cards de indicador que filtram a lista ao clicar */
+button.kpi.clicavel { appearance: none; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+button.kpi.clicavel:hover { transform: translateY(-1px); }
+button.kpi.clicavel:focus-visible { outline: 2px solid var(--cor, var(--serie)); outline-offset: 2px; }
+button.kpi.clicavel.on { box-shadow: inset 0 0 0 1.5px var(--cor, var(--serie)); }
