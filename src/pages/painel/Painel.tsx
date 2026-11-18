@@ -14,14 +14,15 @@ import Respostas from "./Respostas";
 import MapaCalor from "./MapaCalor";
 import Insights from "./Insights";
 import Usuarios from "./Usuarios";
+import TrocarSenha, { JanelaSenha } from "./TrocarSenha";
 import { anosDisponiveis, chaveNome, filtrar, MESES_LONGO, semFiltro, situacoesDisponiveis, type Filtro } from "./metrics";
 
 const ABAS = [
   { id: "escola", rotulo: "Escola de Segurança" },
   { id: "avaliacao", rotulo: "Avaliação" },
   { id: "detalhamento", rotulo: "Detalhamento" },
-  { id: "insights", rotulo: "Insights", soAdmin: true },
-  { id: "mapa", rotulo: "Mapa de calor", soAdmin: true },
+  { id: "insights", rotulo: "Insights" },
+  { id: "mapa", rotulo: "Mapa de calor" },
   { id: "respostas", rotulo: "Respostas", soAdmin: true },
   { id: "questoes", rotulo: "Questões", soAdmin: true },
   { id: "usuarios", rotulo: "Usuários", soAdmin: true },
@@ -34,7 +35,8 @@ const abaInicial = (): Aba => ABAS.find((a) => a.id === location.hash.slice(1))?
 const alterna = (lista: string[], v: string) => (lista.includes(v) ? lista.filter((x) => x !== v) : [...lista, v]);
 
 export default function Painel() {
-  const [auth, setAuth] = useState<"checando" | "nao" | "sim">("checando");
+  const [auth, setAuth] = useState<"checando" | "nao" | "trocar" | "sim">("checando");
+  const [senhaAberta, setSenhaAberta] = useState(false);
   const [regs, setRegs] = useState<Registro[]>([]);
   const [questoesLista, setQuestoesLista] = useState<QuestaoResumo[]>([]);
   const [eu, setEu] = useState<Eu | null>(null);
@@ -78,6 +80,11 @@ export default function Painel() {
     try {
       const r = await fetch("/api/admin/registros");
       if (r.status === 401) return setAuth("nao");
+      if (r.status === 403) {
+        // senha provisória: antes de qualquer relatório é preciso definir a nova senha
+        const e = await r.json().catch(() => ({}));
+        if (e.trocarSenha) return setAuth("trocar");
+      }
       const d = await r.json();
       setRegs(d.registros);
       setQuestoesLista(d.questoes ?? []);
@@ -122,6 +129,17 @@ export default function Painel() {
 
   if (auth === "checando") return <div className="carregando">Carregando…</div>;
   if (auth === "nao") return <Login onEntrar={carregar} />;
+  if (auth === "trocar") {
+    return (
+      <TrocarSenha
+        onConcluir={carregar}
+        onSair={async () => {
+          await fetch("/api/admin/logout", { method: "POST" });
+          setAuth("nao");
+        }}
+      />
+    );
+  }
 
   const sair = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -140,7 +158,9 @@ export default function Painel() {
       aberto={menuAberto}
       onFechar={() => setMenuAberto(false)}
       onSair={sair}
+      onSenha={() => { setMenuAberto(false); setSenhaAberta(true); }}
     />
+    {senhaAberta && <JanelaSenha onFechar={() => setSenhaAberta(false)} />}
     <div className="painel-corpo">
     <main className="app-painel">
       <AvisoOffline />
@@ -229,8 +249,8 @@ export default function Painel() {
         {aba === "escola" && <PaginaEscola todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "avaliacao" && <PaginaAvaliacao todos={regs} filtro={filtro} onFiltro={setFiltro} />}
         {aba === "detalhamento" && <PaginaDetalhamento regs={filtrados} questoesLista={questoesLista} />}
-        {aba === "insights" && eu?.admin && <Insights />}
-        {aba === "mapa" && eu?.admin && <MapaCalor />}
+        {aba === "insights" && <Insights />}
+        {aba === "mapa" && <MapaCalor />}
         {aba === "respostas" && eu?.admin && <Respostas onAlterou={carregar} />}
         {aba === "questoes" && eu?.admin && <Questoes onAlterou={carregar} />}
         {aba === "usuarios" && eu?.admin && <Usuarios eu={eu} />}

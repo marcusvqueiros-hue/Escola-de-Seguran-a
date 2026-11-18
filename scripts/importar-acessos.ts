@@ -32,10 +32,10 @@ await iniciarBanco();
 await sql.transaction(
   usuarios.map(
     (u) => sql`
-      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo)
-      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(u.senha)}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo})
+      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo, trocar_senha)
+      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(u.senha)}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo}, TRUE)
       ON CONFLICT (usuario_norm) DO UPDATE SET usuario = EXCLUDED.usuario, senha_hash = EXCLUDED.senha_hash, nome = EXCLUDED.nome,
-        chapa = EXCLUDED.chapa, funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia, processo = EXCLUDED.processo, ativo = TRUE`,
+        chapa = EXCLUDED.chapa, funcao = EXCLUDED.funcao, base = EXCLUDED.base, gerencia = EXCLUDED.gerencia, processo = EXCLUDED.processo, ativo = TRUE, trocar_senha = TRUE`,
   ),
 );
 const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM escola_usuarios WHERE ativo`) as { n: number }[];

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { iniciarBanco, sql } from "./db";
 import { GABARITO } from "./gabarito";
 import { listarQuestoes, questoesAtivas, rotasQuestoes } from "./questoes";
-import { cookieLimpo, cookieSessao, sessaoDe, tentarLogin } from "./auth";
+import { alterarSenha, cookieLimpo, cookieSessao, sessaoDe, tentarLogin } from "./auth";
 import { rotasUsuarios } from "./usuarios";
 import { rotasRespostas } from "./respostas";
 import { rotasMapa } from "./mapa";
@@ -148,8 +148,15 @@ export async function api(req: Request): Promise<Response> {
     if (rota.startsWith("/api/admin/")) {
       const eu = await sessaoDe(req);
       if (!eu) return erro("Não autorizado.", 401);
+      if (rota === "/api/admin/senha" && req.method === "POST") {
+        const b = await req.json().catch(() => ({}));
+        const e = await alterarSenha(ipDe(req), eu.usuario, String(b.atual ?? ""), String(b.nova ?? ""));
+        return e ? erro(e) : json({ ok: true });
+      }
+      // senha provisória: nada além de definir a nova senha
+      if (eu.trocarSenha) return json({ erro: "É preciso definir uma nova senha antes de continuar.", trocarSenha: true }, 403);
       // relatórios (registros e fotos) para qualquer usuário; o restante só para administradores
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor|insights)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas)(\/|$)/.test(rota) && !eu.admin) return erro("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr) return usr;
       const resp = await rotasRespostas(req, rota);
@@ -164,7 +171,7 @@ export async function api(req: Request): Promise<Response> {
       if (quest) return quest;
       if (rota === "/api/admin/registros") {
         const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
-        return json({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
+        return json({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin, desenvolvedor: eu.desenvolvedor } });
       }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {

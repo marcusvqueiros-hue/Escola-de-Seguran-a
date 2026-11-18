@@ -58,6 +58,7 @@ export interface Eu {
   nome: string;
   usuario: string;
   admin: boolean;
+  desenvolvedor?: boolean; // conta das variáveis de ambiente: a senha não é trocada pelo painel
 }
 
 /** Questão como o administrador a vê (com a resposta correta). */

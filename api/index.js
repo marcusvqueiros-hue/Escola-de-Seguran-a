@@ -6239,6 +6239,7 @@ function iniciarBanco() {
       )`;
     await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
     await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS trocar_senha BOOLEAN NOT NULL DEFAULT FALSE`;
     await sql`
       CREATE TABLE IF NOT EXISTS escola_questoes (
         id        SERIAL PRIMARY KEY,
@@ -6450,12 +6451,49 @@ async function sessaoDe(req) {
   if (!(Number(exp) > Date.now() / 1000) || !igual(mac, assinar(`${chaveB64}.${exp}`, config().segredo)))
     return null;
   const chave = Buffer.from(chaveB64, "base64url").toString();
-  const [u] = await sql`SELECT usuario, nome, admin, ativo FROM escola_usuarios WHERE usuario_norm = ${chave}`;
+  const [u] = await sql`SELECT usuario, nome, admin, ativo, trocar_senha FROM escola_usuarios WHERE usuario_norm = ${chave}`;
   if (ehDesenvolvedor(chave))
-    return { usuario: u?.usuario ?? chave, nome: u?.nome || "Desenvolvedor", admin: true, desenvolvedor: true };
+    return { usuario: u?.usuario ?? chave, nome: u?.nome || "Desenvolvedor", admin: true, desenvolvedor: true, trocarSenha: false };
   if (!u || !u.ativo)
     return null;
-  return { usuario: u.usuario, nome: u.nome || u.usuario, admin: u.admin, desenvolvedor: false };
+  return { usuario: u.usuario, nome: u.nome || u.usuario, admin: u.admin, desenvolvedor: false, trocarSenha: u.trocar_senha };
+}
+function erroSenhaNova(nova, atual, usuario) {
+  if (nova.length < 8)
+    return "A nova senha precisa ter pelo menos 8 caracteres.";
+  if (nova.length > 100)
+    return "A nova senha é longa demais.";
+  if (!/[A-Za-z]/.test(nova) || !/\d/.test(nova))
+    return "Use letras e números na nova senha.";
+  if (nova === atual)
+    return "A nova senha precisa ser diferente da atual.";
+  if (nova.toLowerCase().replace("@", "") === usuario.toLowerCase().replace("@", ""))
+    return "A senha não pode ser igual ao usuário.";
+  return null;
+}
+async function alterarSenha(ip, usuario, atual, nova) {
+  if (ehDesenvolvedor(usuario))
+    return "A senha da conta do desenvolvedor é definida nas variáveis de ambiente.";
+  const chaveIp = `senha|${ip}`;
+  const agora = Date.now();
+  const [f] = await sql`SELECT n, ate FROM escola_falhas_login WHERE ip = ${chaveIp}`;
+  const ativa = f && Number(f.ate) > agora;
+  if (ativa && f.n >= 5)
+    return "Muitas tentativas. Aguarde alguns minutos.";
+  const chave = usuario.trim().toLowerCase();
+  const [u] = await sql`SELECT senha_hash FROM escola_usuarios WHERE usuario_norm = ${chave} AND ativo`;
+  if (!u || !confere(atual, u.senha_hash)) {
+    const n = (ativa ? f.n : 0) + 1;
+    await sql`INSERT INTO escola_falhas_login (ip, n, ate) VALUES (${chaveIp}, ${n}, ${agora + 5 * 60 * 1000})
+              ON CONFLICT (ip) DO UPDATE SET n = ${n}, ate = ${agora + 5 * 60 * 1000}`;
+    return "A senha atual está incorreta.";
+  }
+  const erro = erroSenhaNova(nova, atual, usuario);
+  if (erro)
+    return erro;
+  await sql`UPDATE escola_usuarios SET senha_hash = ${hashSenha(nova)}, trocar_senha = FALSE WHERE usuario_norm = ${chave}`;
+  await sql`DELETE FROM escola_falhas_login WHERE ip = ${chaveIp}`;
+  return null;
 }
 var seguro = (req) => new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
 var cookieSessao = (token, req) => `sessao=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSAO_S}${seguro(req) ? "; Secure" : ""}`;
@@ -6466,8 +6504,8 @@ var json2 = (data, status = 200) => Response.json(data, { status, headers: { "Ca
 var erro2 = (msg, status = 400) => json2({ erro: msg }, status);
 var limpa2 = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 async function listar() {
-  const rs = await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo FROM escola_usuarios ORDER BY nome, usuario`;
-  return rs.map((u) => ({ ...u, desenvolvedor: ehDesenvolvedor(u.usuario) }));
+  const rs = await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha FROM escola_usuarios ORDER BY nome, usuario`;
+  return rs.map(({ trocar_senha, ...u }) => ({ ...u, trocarSenha: !!trocar_senha, desenvolvedor: ehDesenvolvedor(u.usuario) }));
 }
 var nomeAcesso = (v) => {
   const s = limpa2(v, 40).replace(/\s/g, "");
@@ -6538,8 +6576,8 @@ async function rotasUsuarios(req, rota, eu) {
     if (dup || ehDesenvolvedor(u.usuario))
       return erro2("Já existe um usuário com este nome de acesso.", 409);
     const [novo] = await sql`
-      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo, admin, ativo)
-      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(String(b.senha))}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo}, ${u.admin === true}, ${u.ativo !== false})
+      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha)
+      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(String(b.senha))}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo}, ${u.admin === true}, ${u.ativo !== false}, TRUE)
       RETURNING id`;
     return json2({ ok: true, id: novo.id });
   }
@@ -6596,7 +6634,8 @@ async function rotasUsuarios(req, rota, eu) {
     await sql`
       UPDATE escola_usuarios SET usuario = ${novo.usuario}, usuario_norm = ${novo.usuario.toLowerCase()}, nome = ${novo.nome}, chapa = ${novo.chapa},
         funcao = ${novo.funcao}, base = ${novo.base}, gerencia = ${novo.gerencia}, processo = ${novo.processo}, admin = ${novo.admin}, ativo = ${novo.ativo},
-        senha_hash = COALESCE(${hash}, senha_hash)
+        senha_hash = COALESCE(${hash}, senha_hash),
+        trocar_senha = (trocar_senha OR (${hash}::text IS NOT NULL AND NOT ${proprio}::boolean))
       WHERE id = ${id}`;
     return json2({ ok: true });
   }
@@ -7458,7 +7497,14 @@ async function api(req) {
       const eu = await sessaoDe(req);
       if (!eu)
         return erro5("Não autorizado.", 401);
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor|insights)(\/|$)/.test(rota) && !eu.admin)
+      if (rota === "/api/admin/senha" && req.method === "POST") {
+        const b = await req.json().catch(() => ({}));
+        const e = await alterarSenha(ipDe(req), eu.usuario, String(b.atual ?? ""), String(b.nova ?? ""));
+        return e ? erro5(e) : json7({ ok: true });
+      }
+      if (eu.trocarSenha)
+        return json7({ erro: "É preciso definir uma nova senha antes de continuar.", trocarSenha: true }, 403);
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas)(\/|$)/.test(rota) && !eu.admin)
         return erro5("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr)
@@ -7480,7 +7526,7 @@ async function api(req) {
         return quest;
       if (rota === "/api/admin/registros") {
         const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
-        return json7({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
+        return json7({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin, desenvolvedor: eu.desenvolvedor } });
       }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {

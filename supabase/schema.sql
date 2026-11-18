@@ -93,3 +93,6 @@ ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFA
 -- Marca que a carga inicial do Forms já foi feita (apagar registros importados na aba Respostas não os traz de volta).
 CREATE TABLE IF NOT EXISTS escola_meta (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
 ALTER TABLE escola_meta ENABLE ROW LEVEL SECURITY;
+
+-- Senha provisória: o usuário só consegue definir a nova senha antes de acessar os relatórios.
+ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS trocar_senha BOOLEAN NOT NULL DEFAULT FALSE;

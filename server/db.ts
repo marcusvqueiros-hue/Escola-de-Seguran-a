@@ -99,6 +99,7 @@ export function iniciarBanco() {
       )`;
     await sql`ALTER TABLE escola_usuarios ENABLE ROW LEVEL SECURITY`;
     await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE escola_usuarios ADD COLUMN IF NOT EXISTS trocar_senha BOOLEAN NOT NULL DEFAULT FALSE`;
 
     // Questões editáveis: cada avaliação guarda os ids que recebeu e o que acertou, então mudar o gabarito não reescreve o histórico.
     await sql`

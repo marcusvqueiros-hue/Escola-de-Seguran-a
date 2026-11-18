@@ -13,6 +13,7 @@ const ICONES: Record<string, string> = {
   usuarios: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
   configuracao: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
   atualizar: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
+  senha: "M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4",
   sair: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   menu: "M4 6h16M4 12h16M4 18h16",
   seta: "M15 18l-6-6 6-6",
@@ -32,7 +33,8 @@ interface Item {
 }
 
 interface Props {
-  eu: { nome: string; admin: boolean } | null;
+  eu: { nome: string; admin: boolean; desenvolvedor?: boolean } | null;
+  onSenha: () => void;
   itens: readonly Item[];
   ativo: string;
   onEscolher: (id: string) => void;
@@ -56,7 +58,7 @@ function useGaveta() {
   return g;
 }
 
-export function MenuLateral({ eu, itens, ativo, onEscolher, recolhido, onRecolher, aberto, onFechar, onSair }: Props) {
+export function MenuLateral({ onSenha, eu, itens, ativo, onEscolher, recolhido, onRecolher, aberto, onFechar, onSair }: Props) {
   const gaveta = useGaveta();
   const compacto = recolhido && !gaveta;
   const acao = (nome: string, rotulo: string, onClick: () => void): ReactNode => (
@@ -100,6 +102,7 @@ export function MenuLateral({ eu, itens, ativo, onEscolher, recolhido, onRecolhe
               </div>
             )}
             <div className="menu-instalar"><InstalarBotao sobreEscuro /></div>
+            {eu && !eu.desenvolvedor && acao("senha", "Alterar senha", onSenha)}
             {acao("sair", "Sair", onSair)}
           </div>
         </div>

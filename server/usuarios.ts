@@ -7,8 +7,8 @@ const erro = (msg: string, status = 400) => json({ erro: msg }, status);
 const limpa = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 async function listar() {
-  const rs = (await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo FROM escola_usuarios ORDER BY nome, usuario`) as any[];
-  return rs.map((u) => ({ ...u, desenvolvedor: ehDesenvolvedor(u.usuario) }));
+  const rs = (await sql`SELECT id, usuario, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha FROM escola_usuarios ORDER BY nome, usuario`) as any[];
+  return rs.map(({ trocar_senha, ...u }) => ({ ...u, trocarSenha: !!trocar_senha, desenvolvedor: ehDesenvolvedor(u.usuario) }));
 }
 
 const nomeAcesso = (v: unknown) => {
@@ -73,8 +73,8 @@ export async function rotasUsuarios(req: Request, rota: string, eu: Sessao): Pro
     const [dup] = (await sql`SELECT 1 FROM escola_usuarios WHERE usuario_norm = ${u.usuario.toLowerCase()}`) as unknown[];
     if (dup || ehDesenvolvedor(u.usuario)) return erro("Já existe um usuário com este nome de acesso.", 409);
     const [novo] = (await sql`
-      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo, admin, ativo)
-      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(String(b.senha))}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo}, ${u.admin === true}, ${u.ativo !== false})
+      INSERT INTO escola_usuarios (usuario, usuario_norm, senha_hash, nome, chapa, funcao, base, gerencia, processo, admin, ativo, trocar_senha)
+      VALUES (${u.usuario}, ${u.usuario.toLowerCase()}, ${hashSenha(String(b.senha))}, ${u.nome}, ${u.chapa}, ${u.funcao}, ${u.base}, ${u.gerencia}, ${u.processo}, ${u.admin === true}, ${u.ativo !== false}, TRUE)
       RETURNING id`) as { id: number }[];
     return json({ ok: true, id: novo!.id });
   }
@@ -123,7 +123,8 @@ export async function rotasUsuarios(req: Request, rota: string, eu: Sessao): Pro
     await sql`
       UPDATE escola_usuarios SET usuario = ${novo.usuario}, usuario_norm = ${novo.usuario.toLowerCase()}, nome = ${novo.nome}, chapa = ${novo.chapa},
         funcao = ${novo.funcao}, base = ${novo.base}, gerencia = ${novo.gerencia}, processo = ${novo.processo}, admin = ${novo.admin}, ativo = ${novo.ativo},
-        senha_hash = COALESCE(${hash}, senha_hash)
+        senha_hash = COALESCE(${hash}, senha_hash),
+        trocar_senha = (trocar_senha OR (${hash}::text IS NOT NULL AND NOT ${proprio}::boolean))
       WHERE id = ${id}`;
     return json({ ok: true });
   }

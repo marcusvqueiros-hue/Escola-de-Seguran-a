@@ -14,6 +14,7 @@ interface Usuario {
   admin: boolean;
   ativo: boolean;
   desenvolvedor: boolean;
+  trocarSenha: boolean;
 }
 
 interface Formulario {
@@ -158,7 +159,7 @@ export default function Usuarios({ eu }: { eu: Eu }) {
                   <td data-rotulo="Perfil">
                     <span className={`selo-sit ${u.admin ? "ok" : ""}`}>{u.desenvolvedor ? "Desenvolvedor" : u.admin ? "Administrador" : "Relatórios"}</span>
                   </td>
-                  <td data-rotulo="Situação"><span className={`selo-sit ${u.ativo ? "ok" : ""}`}>{u.ativo ? "Ativo" : "Desativado"}</span></td>
+                  <td data-rotulo="Situação"><span className={`selo-sit ${u.ativo ? "ok" : ""}`}>{u.ativo ? "Ativo" : "Desativado"}</span>{u.trocarSenha && <span className="selo-sit prov" title="A pessoa ainda precisa definir a própria senha no primeiro acesso">Senha provisória</span>}</td>
                   <td className="acoes-linha">
                     <button title="Editar" aria-label={`Editar ${u.nome}`} onClick={() => setModal({ tipo: "form", dados: { id: u.id, usuario: u.usuario, nome: u.nome, chapa: u.chapa, funcao: u.funcao, base: u.base, gerencia: u.gerencia, admin: u.admin, ativo: u.ativo, senha: "" } })}>✎</button>
                     <button title={u.ativo ? "Desativar acesso" : "Reativar acesso"} aria-label={`${u.ativo ? "Desativar" : "Reativar"} ${u.nome}`} disabled={proprio(u) || u.desenvolvedor} onClick={() => alternarAtivo(u)}>{u.ativo ? "⏸" : "▶"}</button>
@@ -247,7 +248,7 @@ function FormUsuario({ inicial, eu, onSalvar, onFechar }: { inicial: Formulario;
             <input value={f.usuario} onChange={(e) => set({ usuario: e.target.value })} autoCapitalize="off" spellCheck={false} disabled={euMesmo} />
           </label>
           <label className="campo">
-            <span>{novo ? "Senha" : "Nova senha"}</span>
+            <span>{novo ? "Senha provisória" : "Nova senha (provisória)"}</span>
             <div className="senha">
               <input type={ver ? "text" : "password"} value={f.senha} onChange={(e) => set({ senha: e.target.value })} placeholder={novo ? "" : "Deixe em branco para manter"} autoComplete="new-password" />
               <button type="button" className="link" onClick={() => setVer((v) => !v)}>{ver ? "Ocultar" : "Mostrar"}</button>
@@ -271,8 +272,8 @@ function FormUsuario({ inicial, eu, onSalvar, onFechar }: { inicial: Formulario;
         <label className="campo">
           <span>Perfil de acesso</span>
           <select value={f.admin ? "admin" : "leitor"} onChange={(e) => set({ admin: e.target.value === "admin" })} disabled={euMesmo}>
-            <option value="leitor">Somente relatórios (Escola de Segurança, Avaliação e Detalhamento)</option>
-            <option value="admin">Administrador (também Questões, Usuários e Colaboradores)</option>
+            <option value="leitor">Somente relatórios (Escola de Segurança, Avaliação, Detalhamento, Insights e Mapa de calor)</option>
+            <option value="admin">Administrador (também Respostas, Questões, Usuários e Colaboradores)</option>
           </select>
         </label>
         <label className="q-check">

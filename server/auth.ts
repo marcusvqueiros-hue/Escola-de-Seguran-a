@@ -66,6 +66,7 @@ export interface Sessao {
   nome: string;
   admin: boolean;
   desenvolvedor: boolean;
+  trocarSenha: boolean; // senha provisória: só pode definir a nova senha
 }
 
 /** Quem está logado, com o perfil atual. Usuário removido ou desativado perde o acesso na hora. */
@@ -76,10 +77,44 @@ export async function sessaoDe(req: Request): Promise<Sessao | null> {
   if (!(Number(exp) > Date.now() / 1000) || !igual(mac, assinar(`${chaveB64}.${exp}`, config().segredo))) return null;
 
   const chave = Buffer.from(chaveB64, "base64url").toString();
-  const [u] = (await sql`SELECT usuario, nome, admin, ativo FROM escola_usuarios WHERE usuario_norm = ${chave}`) as { usuario: string; nome: string | null; admin: boolean; ativo: boolean }[];
-  if (ehDesenvolvedor(chave)) return { usuario: u?.usuario ?? chave, nome: u?.nome || "Desenvolvedor", admin: true, desenvolvedor: true };
+  const [u] = (await sql`SELECT usuario, nome, admin, ativo, trocar_senha FROM escola_usuarios WHERE usuario_norm = ${chave}`) as { usuario: string; nome: string | null; admin: boolean; ativo: boolean; trocar_senha: boolean }[];
+  if (ehDesenvolvedor(chave)) return { usuario: u?.usuario ?? chave, nome: u?.nome || "Desenvolvedor", admin: true, desenvolvedor: true, trocarSenha: false };
   if (!u || !u.ativo) return null;
-  return { usuario: u.usuario, nome: u.nome || u.usuario, admin: u.admin, desenvolvedor: false };
+  return { usuario: u.usuario, nome: u.nome || u.usuario, admin: u.admin, desenvolvedor: false, trocarSenha: u.trocar_senha };
+}
+
+/** Regras da senha nova: 8+ caracteres, com letra e número, diferente da atual e do usuário. */
+export function erroSenhaNova(nova: string, atual: string, usuario: string): string | null {
+  if (nova.length < 8) return "A nova senha precisa ter pelo menos 8 caracteres.";
+  if (nova.length > 100) return "A nova senha é longa demais.";
+  if (!/[A-Za-z]/.test(nova) || !/\d/.test(nova)) return "Use letras e números na nova senha.";
+  if (nova === atual) return "A nova senha precisa ser diferente da atual.";
+  if (nova.toLowerCase().replace("@", "") === usuario.toLowerCase().replace("@", "")) return "A senha não pode ser igual ao usuário.";
+  return null;
+}
+
+/** O próprio usuário troca a senha (informando a atual); encerra a condição de senha provisória. */
+export async function alterarSenha(ip: string, usuario: string, atual: string, nova: string): Promise<string | null> {
+  if (ehDesenvolvedor(usuario)) return "A senha da conta do desenvolvedor é definida nas variáveis de ambiente.";
+  const chaveIp = `senha|${ip}`;
+  const agora = Date.now();
+  const [f] = (await sql`SELECT n, ate FROM escola_falhas_login WHERE ip = ${chaveIp}`) as { n: number; ate: string }[];
+  const ativa = f && Number(f.ate) > agora;
+  if (ativa && f!.n >= 5) return "Muitas tentativas. Aguarde alguns minutos.";
+
+  const chave = usuario.trim().toLowerCase();
+  const [u] = (await sql`SELECT senha_hash FROM escola_usuarios WHERE usuario_norm = ${chave} AND ativo`) as { senha_hash: string }[];
+  if (!u || !confere(atual, u.senha_hash)) {
+    const n = (ativa ? f!.n : 0) + 1;
+    await sql`INSERT INTO escola_falhas_login (ip, n, ate) VALUES (${chaveIp}, ${n}, ${agora + 5 * 60 * 1000})
+              ON CONFLICT (ip) DO UPDATE SET n = ${n}, ate = ${agora + 5 * 60 * 1000}`;
+    return "A senha atual está incorreta.";
+  }
+  const erro = erroSenhaNova(nova, atual, usuario);
+  if (erro) return erro;
+  await sql`UPDATE escola_usuarios SET senha_hash = ${hashSenha(nova)}, trocar_senha = FALSE WHERE usuario_norm = ${chave}`;
+  await sql`DELETE FROM escola_falhas_login WHERE ip = ${chaveIp}`;
+  return null;
 }
 
 const seguro = (req: Request) => new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
