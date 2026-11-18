@@ -6781,6 +6781,376 @@ async function rotasMapa(req, rota) {
   return json4({ participantes: lista, fonte });
 }
 
+// server/insights.ts
+var json5 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+var TEMAS = [
+  { nome: "Comunicação", treinavel: false, re: /comunicac/ },
+  { nome: "Veículos, transporte e içamento", treinavel: true, re: /transport|acondicion|guincho|guindauto|munck|veiculo|carga\b|pneu|motociclista|freio|icament|cruzeta/ },
+  { nome: "Escadas e trabalho em altura", treinavel: true, re: /escada|altura|linha de vida|talabarte|cinto|spiq|trava ?quedas?|queda|antiqueda|daqc/ },
+  { nome: "Sinalização e isolamento da área", treinavel: true, re: /sinaliz|isolad|isolamento|\bcone|delimit|bandeirol/ },
+  { nome: "APR e procedimentos", treinavel: true, re: /\bapr\b|procedimento|permiss|analise preliminar|ordem de servico|check ?list|condicao insegura|emissao da os|seccionament|controle do coi|cumprir normas|instrucoes|improvis|coordenac/ },
+  { nome: "Ferramentas e equipamentos", treinavel: true, re: /ferrament|vara de manobra|bastao|nr-?10|detector|motosserra|maquina/ },
+  { nome: "Operação e manobras de rede", treinavel: true, re: /chave fusivel|abertura|desligament|religament|rede energizada|energizad|aterramento|manobra|estrutura/ },
+  { nome: "Crachá e documentação", treinavel: false, re: /cracha|qr code|document|identificac|credenc/ },
+  { nome: "Atenção e comportamento", treinavel: true, re: /desatent|comportament|atencao|guardiao|desvio|pressa|habilidade/ },
+  { nome: "Instalações e alojamento", treinavel: false, re: /alojament|arejad|higiene|lazer|banheiro|vestiario|refeitor|limpeza|conservac|agua potavel|chuveiro|papel higienico|lavatorio|glp|piso|iluminac|alimentac|sabonete|devassamento/ },
+  { nome: "EPI e EPC", treinavel: true, re: /\bepi\b|\bepc\b|protetor|vestiment|calcad|luva|manga|capacete|bota|oculos|ensaio|danificad|perneira|balaclava|lencol isolante|cobertura|macacao|barra de seguranca/ }
+];
+var semAcento = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+function temaDe(texto) {
+  const t = semAcento(texto);
+  return TEMAS.find((x) => x.re.test(t)) ?? { nome: "Outros", treinavel: false };
+}
+var dia = (iso) => {
+  const d = new Date(Date.parse(iso) - 3 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+};
+var dias = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+var pct = (a, b) => b ? Math.round(a / b * 1000) / 10 : 0;
+var taxa = (n, pessoasDia) => pessoasDia > 0 ? Math.round(n / pessoasDia * 3000 * 10) / 10 : 0;
+var mais = (m) => [...m].sort((a, b) => b[1] - a[1])[0]?.[0];
+async function rotasInsights(req, rota) {
+  if (rota !== "/api/admin/insights" || req.method !== "GET")
+    return null;
+  const regs = await registros();
+  const questoes = (await listarQuestoes()).filter((q) => q.ativa);
+  const cadastro = await sql`SELECT nome_norm, base, gerencia, situacao FROM escola_colaboradores`;
+  const efetivo = cadastro.filter((c) => (c.situacao ?? "ATIVO") !== "DESLIGADO");
+  const cad = new Map(cadastro.map((c) => [c.nome_norm, c]));
+  let notif = [];
+  let disponivel = true;
+  try {
+    notif = (await sql`SELECT data::text AS data, base, gerencia, nao_conformidade, tratado, dias, status, eletricistas FROM notificacoes WHERE data IS NOT NULL`).map((n) => ({
+      data: n.data,
+      base: n.base ?? "",
+      gerencia: n.gerencia ?? "",
+      nc: String(n.nao_conformidade ?? "").trim(),
+      tratado: !!n.tratado,
+      dias: n.dias == null ? null : Number(n.dias),
+      status: String(n.status ?? ""),
+      pessoas: [...new Set((n.eletricistas ?? []).map((e) => chaveNome(String(e))))]
+    }));
+  } catch (e) {
+    if (e?.code !== "42P01")
+      throw e;
+    disponivel = false;
+  }
+  const dMin = notif.reduce((a, n) => n.data < a ? n.data : a, "9999-12-31");
+  const dMax = notif.reduce((a, n) => n.data > a ? n.data : a, "0000-01-01");
+  const nomeDe = new Map;
+  const escola = new Map;
+  for (const r of [...regs].sort((a, b) => Date.parse(a.data) - Date.parse(b.data))) {
+    const k = chaveNome(r.nome);
+    const p = escola.get(k) ?? { nome: r.nome, base: r.base, gerencia: r.gerencia, dias: [], ultimaAprovada: r.aprovado, ultimoDia: "" };
+    p.dias.push(dia(r.data));
+    Object.assign(p, { nome: r.nome, base: r.base, gerencia: r.gerencia, ultimaAprovada: r.aprovado, ultimoDia: dia(r.data) });
+    escola.set(k, p);
+    nomeDe.set(k, r.nome);
+  }
+  const porPessoa = new Map;
+  for (const n of notif) {
+    for (const k of n.pessoas) {
+      const p = porPessoa.get(k) ?? { datas: [], bases: new Map, ger: new Map };
+      p.datas.push(n.data);
+      if (n.base)
+        p.bases.set(n.base, (p.bases.get(n.base) ?? 0) + 1);
+      if (n.gerencia)
+        p.ger.set(n.gerencia, (p.ger.get(n.gerencia) ?? 0) + 1);
+      porPessoa.set(k, p);
+    }
+  }
+  let antes = 0, depois = 0, diasAntes = 0, diasDepois = 0, reincidiram = 0, notificadosAntes = 0, reincDeNotificados = 0;
+  const demorasAteEscola = [];
+  const reincidentes = [];
+  for (const [k, p] of escola) {
+    const marco = p.dias[0];
+    const ns = porPessoa.get(k)?.datas ?? [];
+    const a = ns.filter((d) => d <= marco).length;
+    const d = ns.filter((x) => x > marco).length;
+    if (disponivel) {
+      if (dias(dMin, marco) > 0) {
+        antes += a;
+        diasAntes += dias(dMin, marco);
+      }
+      if (dias(marco, dMax) > 0) {
+        depois += d;
+        diasDepois += dias(marco, dMax);
+      }
+    }
+    if (a > 0) {
+      notificadosAntes++;
+      if (d > 0)
+        reincDeNotificados++;
+      const primeira = ns.filter((x) => x <= marco).sort()[0];
+      demorasAteEscola.push(dias(primeira, marco));
+    }
+    if (d > 0) {
+      reincidiram++;
+      reincidentes.push({ nome: p.nome, n: d, ultima: ns.sort().at(-1), base: p.base });
+    }
+  }
+  let ctrlN = 0, ctrlDias = 0, ctrlPessoas = 0;
+  for (const [k, p] of porPessoa) {
+    if (escola.has(k))
+      continue;
+    const ds = [...p.datas].sort();
+    const janela = dias(ds[0], dMax);
+    if (janela <= 0)
+      continue;
+    ctrlPessoas++;
+    ctrlDias += janela;
+    ctrlN += ds.filter((d) => d > ds[0]).length;
+  }
+  const taxaAntes = taxa(antes, diasAntes);
+  const taxaDepois = taxa(depois, diasDepois);
+  const taxaRef = taxa(ctrlN, ctrlDias);
+  const variacao = taxaAntes > 0 ? Math.round((taxaDepois - taxaAntes) / taxaAntes * 100) : null;
+  const tempoAteEscola = demorasAteEscola.length ? Math.round(demorasAteEscola.reduce((a, b) => a + b, 0) / demorasAteEscola.length) : null;
+  const mes = (d) => d.slice(0, 7);
+  const meses = new Map;
+  for (const n of notif)
+    meses.set(mes(n.data), { notificacoes: (meses.get(mes(n.data))?.notificacoes ?? 0) + 1, participacoes: meses.get(mes(n.data))?.participacoes ?? 0 });
+  for (const r of regs) {
+    const m = mes(dia(r.data));
+    meses.set(m, { notificacoes: meses.get(m)?.notificacoes ?? 0, participacoes: (meses.get(m)?.participacoes ?? 0) + 1 });
+  }
+  const porMes = [...meses].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ mes: m, ...v }));
+  const questoesPorTema = new Map;
+  for (const q of questoes) {
+    const t = temaDe(`${q.enunciado} ${q.opcoes.join(" ")}`).nome;
+    questoesPorTema.set(t, (questoesPorTema.get(t) ?? 0) + 1);
+  }
+  const contTema = new Map;
+  const contNC = new Map;
+  for (const n of notif) {
+    if (!n.nc)
+      continue;
+    const t = temaDe(n.nc).nome;
+    contTema.set(t, (contTema.get(t) ?? 0) + 1);
+    contNC.set(n.nc, (contNC.get(n.nc) ?? 0) + 1);
+  }
+  const totalNC = [...contTema.values()].reduce((a, b) => a + b, 0);
+  const temas = [...contTema].map(([tema, n]) => ({ tema, n, pct: pct(n, totalNC), questoes: questoesPorTema.get(tema) ?? 0, treinavel: TEMAS.find((x) => x.nome === tema)?.treinavel ?? false })).sort((a, b) => b.n - a.n);
+  const topNCs = [...contNC].map(([texto, n]) => ({ texto, n })).sort((a, b) => b.n - a.n).slice(0, 10);
+  const cobertura = (campo) => {
+    const nots = new Map;
+    for (const n of notif)
+      if (n[campo])
+        nots.set(n[campo], (nots.get(n[campo]) ?? 0) + 1);
+    const part = new Map;
+    for (const p of escola.values())
+      if (p[campo])
+        part.set(p[campo], (part.get(p[campo]) ?? 0) + 1);
+    const efet = new Map;
+    for (const c of efetivo)
+      if (c[campo])
+        efet.set(c[campo], (efet.get(c[campo]) ?? 0) + 1);
+    const totalN = [...nots.values()].reduce((a, b) => a + b, 0);
+    const totalP = [...part.values()].reduce((a, b) => a + b, 0);
+    return [...new Set([...nots.keys(), ...part.keys()])].map((k) => ({
+      nome: k,
+      notificacoes: nots.get(k) ?? 0,
+      pctNotificacoes: pct(nots.get(k) ?? 0, totalN),
+      participantes: part.get(k) ?? 0,
+      pctParticipantes: pct(part.get(k) ?? 0, totalP),
+      efetivo: efet.get(k) ?? 0,
+      cobertura: pct(part.get(k) ?? 0, efet.get(k) ?? 0)
+    })).sort((a, b) => b.notificacoes - a.notificacoes);
+  };
+  const porBase = cobertura("base");
+  const porGerencia = cobertura("gerencia");
+  const aprovadas = regs.filter((r) => r.aprovado).length;
+  const mediaNota = regs.length ? regs.reduce((a, r) => a + r.nota, 0) / regs.length : 0;
+  const repetentes = [...escola.values()].filter((p) => p.dias.length > 1).length;
+  const reprovadosSemNova = [...escola.values()].filter((p) => !p.ultimaAprovada);
+  const erros = questoes.map((q, i) => {
+    let aplic = 0, err = 0;
+    for (const r of regs) {
+      const idx = r.questoes.indexOf(q.id);
+      if (idx < 0)
+        continue;
+      aplic++;
+      if (!r.acertos[idx])
+        err++;
+    }
+    return { numero: i + 1, enunciado: q.enunciado, aplicadas: aplic, erros: err, taxa: pct(err, aplic), tema: temaDe(`${q.enunciado} ${q.opcoes.join(" ")}`).nome };
+  }).filter((q) => q.aplicadas >= 10).sort((a, b) => b.taxa - a.taxa);
+  const pendentes = notif.filter((n) => !n.tratado).length;
+  const diasMedios = notif.filter((n) => n.dias != null);
+  const tempoResposta = diasMedios.length ? Math.round(diasMedios.reduce((a, n) => a + (n.dias ?? 0), 0) / diasMedios.length * 10) / 10 : null;
+  const convocar = [...porPessoa].filter(([k, p]) => !escola.has(k) && p.datas.length >= 2 && (cad.get(k)?.situacao ?? "ATIVO") !== "DESLIGADO").map(([k, p]) => ({ nome: nomeDe.get(k) ?? cad.get(k)?.nome_norm ?? k, chave: k, n: p.datas.length, base: cad.get(k)?.base || mais(p.bases) || "", gerencia: cad.get(k)?.gerencia || mais(p.ger) || "" })).sort((a, b) => b.n - a.n || a.chave.localeCompare(b.chave));
+  const acoes = [];
+  const fmt = (n) => n.toLocaleString("pt-BR");
+  if (disponivel && convocar.length) {
+    acoes.push({
+      prioridade: "alta",
+      tipo: "alerta",
+      titulo: `Convocar ${convocar.length} colaboradores notificados mais de uma vez`,
+      evidencia: `${convocar.length} pessoas têm 2 ou mais notificações e ainda não participaram da Escola de Segurança. As maiores têm ${convocar[0].n} notificações.`,
+      acao: "Incluí-los nas próximas turmas, começando pelos com mais notificações, e combinar a convocação com o coordenador de cada um.",
+      itens: convocar.slice(0, 10).map((c) => `${c.nome.toUpperCase()} — ${[c.base, c.gerencia].filter(Boolean).join("/") || "sem base"} — ${c.n} notificações`)
+    });
+  }
+  if (disponivel && reincidentes.length) {
+    acoes.push({
+      prioridade: "alta",
+      tipo: "alerta",
+      titulo: reincidentes.length === 1 ? "1 participante recebeu notificação depois da Escola" : `${reincidentes.length} participantes receberam notificação depois da Escola`,
+      evidencia: `${pct(reincidentes.length, escola.size)}% dos participantes tiveram notificação depois de participar (${reincidentes.reduce((a, r) => a + r.n, 0)} no total).`,
+      acao: "Fazer acompanhamento individual com a liderança, entender se a causa é falta de conhecimento ou de comportamento e reforçar com treinamento prático em campo.",
+      itens: reincidentes.sort((a, b) => b.n - a.n).map((r) => `${r.nome.toUpperCase()} — ${r.base} — ${r.n} notificação(ões) depois da Escola`)
+    });
+  }
+  if (disponivel) {
+    for (const t of temas.filter((x) => x.treinavel && x.questoes === 0 && x.pct >= 8).slice(0, 2)) {
+      acoes.push({
+        prioridade: "alta",
+        tipo: "oportunidade",
+        titulo: `Tema "${t.tema}" não está na avaliação`,
+        evidencia: `Responde por ${t.pct}% das notificações (${fmt(t.n)}) e não tem nenhuma questão ativa na avaliação da Escola.`,
+        acao: `Incluir um módulo de conteúdo e questões sobre "${t.tema}" na aba Questões, e reaplicar para quem já participou.`
+      });
+    }
+    const baixos = temas.filter((x) => x.treinavel && x.questoes === 1 && x.pct >= 10).slice(0, 1);
+    for (const t of baixos) {
+      acoes.push({
+        prioridade: "media",
+        tipo: "oportunidade",
+        titulo: `Tema "${t.tema}" tem pouca cobertura`,
+        evidencia: `${t.pct}% das notificações, com apenas 1 questão na avaliação.`,
+        acao: "Ampliar o número de questões e o conteúdo do tema."
+      });
+    }
+    const criticas = porBase.filter((b) => b.pctNotificacoes >= 12 && b.pctParticipantes < b.pctNotificacoes * 0.6);
+    if (criticas.length) {
+      acoes.push({
+        prioridade: "alta",
+        tipo: "alerta",
+        titulo: `${criticas.map((b) => b.nome).join(", ")}: muitas notificações e pouca participação na Escola`,
+        evidencia: criticas.map((b) => `${b.nome} tem ${b.pctNotificacoes}% das notificações e ${b.pctParticipantes}% dos participantes (${b.participantes} de ${fmt(b.efetivo)} do efetivo).`).join(" "),
+        acao: "Programar turmas dedicadas nessas bases, de preferência presenciais, até a participação acompanhar a proporção de notificações."
+      });
+    }
+    const gerCriticas = porGerencia.filter((g) => g.pctNotificacoes >= 15 && g.pctParticipantes < g.pctNotificacoes * 0.6);
+    if (gerCriticas.length) {
+      acoes.push({
+        prioridade: "media",
+        tipo: "alerta",
+        titulo: `Gerência ${gerCriticas.map((g) => g.nome).join(", ")} com baixa participação frente às notificações`,
+        evidencia: gerCriticas.map((g) => `${g.nome}: ${g.pctNotificacoes}% das notificações e ${g.pctParticipantes}% dos participantes.`).join(" "),
+        acao: "Alinhar com os coordenadores da gerência um calendário de participação."
+      });
+    }
+  }
+  if (disponivel && questoes.length >= 4) {
+    const exc = [...questoesPorTema].find(([t, q]) => q / questoes.length >= 0.4 && (temas.find((x) => x.tema === t)?.pct ?? 0) < 5);
+    if (exc) {
+      const [t, q] = exc;
+      acoes.push({
+        prioridade: "media",
+        tipo: "oportunidade",
+        titulo: "Conteúdo da avaliação concentrado em um tema com poucas notificações",
+        evidencia: `${q} de ${questoes.length} questões (${pct(q, questoes.length)}%) são sobre "${t}", tema com ${temas.find((x) => x.tema === t)?.pct ?? 0}% das notificações.`,
+        acao: "Redistribuir as questões entre os temas que mais geram notificações, como os listados em Não conformidades x conteúdo da Escola."
+      });
+    }
+  }
+  if (erros.length && erros[0].taxa >= 30) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "alerta",
+      titulo: "Questões com maior taxa de erro",
+      evidencia: `A questão ${erros[0].numero} tem ${erros[0].taxa}% de erro (${erros[0].erros} de ${erros[0].aplicadas}).`,
+      acao: "Revisar o conteúdo e a redação dessas questões e conferir o gabarito. Se muitos erram a mesma questão, o ponto pode estar mal explicado no treinamento.",
+      itens: erros.slice(0, 3).map((q) => `Questão ${q.numero} (${q.tema}) — ${q.taxa}% de erro — ${q.enunciado.slice(0, 90)}${q.enunciado.length > 90 ? "…" : ""}`)
+    });
+  }
+  if (reprovadosSemNova.length) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "oportunidade",
+      titulo: `${reprovadosSemNova.length} colaboradores reprovados não refizeram a avaliação`,
+      evidencia: `A última avaliação de ${reprovadosSemNova.length} pessoas ficou abaixo da nota mínima e não houve nova tentativa.`,
+      acao: "Reforçar o conteúdo com a liderança e reaplicar a avaliação.",
+      itens: reprovadosSemNova.slice(0, 10).map((p) => `${p.nome.toUpperCase()} — ${p.base}/${p.gerencia}`)
+    });
+  }
+  if (disponivel && pendentes > 0) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "alerta",
+      titulo: `${pendentes} notificações ainda sem tratamento`,
+      evidencia: `${pct(pendentes, notif.length)}% das notificações não foram tratadas${tempoResposta != null ? `; o tempo médio de resposta registrado é de ${tempoResposta} dias` : ""}.`,
+      acao: "Cobrar o tratamento com os coordenadores responsáveis, pois uma não conformidade sem tratamento tende a se repetir."
+    });
+  }
+  const efetivoN = efetivo.length;
+  if (efetivoN && escola.size / efetivoN < 0.2) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "oportunidade",
+      titulo: "Baixa cobertura do efetivo",
+      evidencia: `${escola.size} colaboradores passaram pela Escola, o que representa ${pct(escola.size, efetivoN)}% dos ${fmt(efetivoN)} cadastrados.`,
+      acao: "Definir uma meta de participação por gerência e um calendário de turmas, priorizando quem já tem notificação."
+    });
+  }
+  if (disponivel && notificadosAntes >= 5 && reincDeNotificados === 0) {
+    acoes.push({
+      prioridade: "info",
+      tipo: "positivo",
+      titulo: "Ninguém que já tinha sido notificado voltou a ser notificado depois da Escola",
+      evidencia: `Dos ${notificadosAntes} participantes que tinham notificação antes de participar, nenhum recebeu nova notificação depois.`,
+      acao: "Resultado favorável, mas o período de acompanhamento ainda é curto; continuar monitorando."
+    });
+  }
+  if (disponivel && variacao != null) {
+    acoes.push({
+      prioridade: "info",
+      tipo: variacao < 0 ? "positivo" : "alerta",
+      titulo: variacao < 0 ? `Queda de ${Math.abs(variacao)}% nas notificações por pessoa depois da Escola` : `As notificações por pessoa subiram ${variacao}% depois da Escola`,
+      evidencia: `Participantes: ${taxaAntes} notificações por 100 pessoas-mês antes e ${taxaDepois} depois. Quem foi notificado e não participou: ${taxaRef} no mesmo critério.`,
+      acao: variacao < 0 ? "O sinal é favorável; manter o ritmo de turmas e acompanhar nos próximos meses." : "Revisar conteúdo e método do treinamento e acompanhar os participantes em campo."
+    });
+  }
+  const ordem = { alta: 0, media: 1, info: 2 };
+  acoes.sort((a, b) => ordem[a.prioridade] - ordem[b.prioridade]);
+  return json5({
+    disponivel,
+    periodo: { de: disponivel ? dMin : null, ate: disponivel ? dMax : null },
+    programa: {
+      participacoes: regs.length,
+      participantes: escola.size,
+      efetivo: efetivoN,
+      cobertura: pct(escola.size, efetivoN),
+      aprovacao: pct(aprovadas, regs.length),
+      mediaNota: Math.round(mediaNota * 100) / 100,
+      repetentes,
+      reprovadosSemNova: reprovadosSemNova.length
+    },
+    efetividade: {
+      participantes: escola.size,
+      notificadosAntes,
+      reincidiram,
+      taxaReincidencia: pct(reincidiram, escola.size),
+      reincidenciaDosNotificados: pct(reincDeNotificados, notificadosAntes),
+      taxaAntes,
+      taxaDepois,
+      taxaReferencia: taxaRef,
+      variacao,
+      pessoasReferencia: ctrlPessoas,
+      tempoAteEscola,
+      notificacoesAntes: antes,
+      notificacoesDepois: depois
+    },
+    notificacoes: { total: notif.length, tratadas: notif.length - pendentes, pendentes, tempoResposta, temas, topNCs },
+    porMes,
+    porBase,
+    porGerencia,
+    erros: erros.slice(0, 5),
+    acoes
+  });
+}
+
 // server/gerentes.ts
 async function aplicarRegraGerentes(somenteVazios) {
   const linhas = REGRAS_COORDENADORES.flatMap((r) => (r.bases ?? ["*"]).map((b) => ({ gerencia: r.gerencia, base: b, gerente: r.gerente })));
@@ -6794,8 +7164,8 @@ async function aplicarRegraGerentes(somenteVazios) {
 }
 
 // server/colaboradores.ts
-var json5 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-var erro4 = (msg, status = 400) => json5({ erro: msg }, status);
+var json6 = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+var erro4 = (msg, status = 400) => json6({ erro: msg }, status);
 var txt = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 function limpar(b) {
   return {
@@ -6907,7 +7277,7 @@ async function importar(b) {
       await sql.transaction(ops);
   }
   const amostra = (xs) => xs.slice(0, 60);
-  return json5({
+  return json6({
     aplicado: aplicar,
     resumo: { lidos: entrada.length, novos: novos.length, alterados: alterados.length, removidos: removidos.length, invalidos: invalidos.length, semMudanca: novoSet.length - novos.length - alterados.length },
     novos: amostra(novos.map((c) => ({ chapa: c.chapa, nome: c.nome, base: c.base, gerencia: c.gerencia }))),
@@ -6920,7 +7290,7 @@ async function rotasColaboradores(req, rota) {
   if (rota === "/api/admin/colaboradores") {
     if (req.method === "GET") {
       const rs = await sql`SELECT id, nome, matricula, funcao, base, gerencia, gerente, situacao FROM escola_colaboradores ORDER BY nome_norm`;
-      return json5({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
+      return json6({ colaboradores: rs.map(linha), bases: BASES, gerencias: GERENCIAS });
     }
     if (req.method === "POST") {
       const c = limpar(await req.json().catch(() => null));
@@ -6934,12 +7304,12 @@ async function rotasColaboradores(req, rota) {
         return erro4("Já existe colaborador com essa chapa ou esse nome.", 409);
       const [novo] = await sql`INSERT INTO escola_colaboradores (nome, nome_norm, matricula, prefixo, funcao, base, gerencia, gerente, situacao)
         VALUES (${c.nome}, ${chaveNome(c.nome)}, ${c.chapa}, '', ${c.funcao}, ${c.base}, ${c.gerencia}, ${c.gerente}, ${c.situacao}) RETURNING id`;
-      return json5({ ok: true, id: novo.id }, 201);
+      return json6({ ok: true, id: novo.id }, 201);
     }
   }
   if (rota === "/api/admin/colaboradores/gerentes" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
-    return json5({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
+    return json6({ ok: true, alterados: await aplicarRegraGerentes(!!b?.somenteVazios) });
   }
   if (rota === "/api/admin/colaboradores/importar" && req.method === "POST")
     return importar(await req.json().catch(() => null));
@@ -6957,19 +7327,19 @@ async function rotasColaboradores(req, rota) {
         return erro4("Outro colaborador já usa essa chapa ou esse nome.", 409);
       const r = await sql`UPDATE escola_colaboradores SET nome = ${c.nome}, nome_norm = ${chaveNome(c.nome)}, matricula = ${c.chapa}, funcao = ${c.funcao},
         base = ${c.base}, gerencia = ${c.gerencia}, gerente = ${c.gerente}, situacao = ${c.situacao} WHERE id = ${id} RETURNING id`;
-      return r.length ? json5({ ok: true }) : erro4("Colaborador não encontrado.", 404);
+      return r.length ? json6({ ok: true }) : erro4("Colaborador não encontrado.", 404);
     }
     if (req.method === "DELETE") {
       const r = await sql`DELETE FROM escola_colaboradores WHERE id = ${id} RETURNING id`;
-      return r.length ? json5({ ok: true }) : erro4("Colaborador não encontrado.", 404);
+      return r.length ? json6({ ok: true }) : erro4("Colaborador não encontrado.", 404);
     }
   }
   return null;
 }
 
 // server/handlers.ts
-var json6 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
-var erro5 = (msg, status = 400) => json6({ erro: msg }, status);
+var json7 = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
+var erro5 = (msg, status = 400) => json7({ erro: msg }, status);
 var limpa4 = (v, max = 120) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 var LETRAS_ARR = ["A", "B", "C", "D"];
 var LETRAS3 = new Set(LETRAS_ARR);
@@ -6999,7 +7369,7 @@ async function iniciar(req) {
   await sql`INSERT INTO escola_tentativas (id, iniciada_em, nome, matricula, prefixo, funcao, base, gerencia, questoes)
             VALUES (${id}, ${new Date().toISOString()}, ${nome}, ${matricula}, ${prefixo}, ${funcao}, ${base}, ${gerencia}, ${JSON.stringify(ativas.map((q) => q.id))})`;
   const questoes = ativas.map((q) => ({ id: q.id, enunciado: q.enunciado, opcoes: q.opcoes.map((texto, i) => ({ letra: LETRAS_ARR[i], texto })) }));
-  return json6({ id, duracaoSeg: DURACAO_SEG, questoes });
+  return json7({ id, duracaoSeg: DURACAO_SEG, questoes });
 }
 async function finalizar(req) {
   const b = await req.json().catch(() => null);
@@ -7041,7 +7411,7 @@ async function finalizar(req) {
   ]);
   await sql`UPDATE escola_colaboradores SET prefixo = ${t.prefixo} WHERE nome_norm = ${chaveNome(t.nome)}`;
   const nota = acertos.filter(Boolean).length;
-  return json6({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
+  return json7({ nota, total: ids.length, aprovado: nota >= notaMinima(ids.length), notaMinima: notaMinima(ids.length) });
 }
 async function api(req) {
   const { pathname } = new URL(req.url);
@@ -7052,22 +7422,22 @@ async function api(req) {
       const q = chaveNome(new URL(req.url).searchParams.get("q") ?? "").slice(0, 60);
       const digitos = /^\d+$/.test(q);
       if (q.length < 2)
-        return json6({ resultados: [] });
+        return json7({ resultados: [] });
       const seguro = q.replace(/[\\%_]/g, (m) => `\\${m}`);
       const padrao = `%${seguro}%`;
       const inicio = `${seguro}%`;
       const rs = digitos ? await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE matricula LIKE ${inicio} ORDER BY matricula LIMIT 8` : await sql`SELECT id, nome, base, matricula FROM escola_colaboradores WHERE nome_norm LIKE ${padrao}
                     ORDER BY (nome_norm LIKE ${inicio}) DESC, nome_norm LIMIT 8`;
-      return json6({ resultados: rs });
+      return json7({ resultados: rs });
     }
     const colab = /^\/api\/colaboradores\/(\d+)$/.exec(rota)?.[1];
     if (colab && req.method === "GET") {
       const [c] = await sql`SELECT nome, matricula, prefixo, funcao, base, gerencia FROM escola_colaboradores WHERE id = ${Number(colab)}`;
-      return c ? json6(c) : erro5("Colaborador não encontrado.", 404);
+      return c ? json7(c) : erro5("Colaborador não encontrado.", 404);
     }
     if (rota === "/api/avaliacao/info" && req.method === "GET") {
       const total = (await questoesAtivas()).length;
-      return json6({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
+      return json7({ total, notaMinima: notaMinima(total), duracaoSeg: DURACAO_SEG });
     }
     if (rota === "/api/avaliacao/iniciar" && req.method === "POST")
       return await iniciar(req);
@@ -7078,17 +7448,17 @@ async function api(req) {
       const r = await tentarLogin(ipDe(req), String(b.usuario ?? ""), String(b.senha ?? ""));
       if (!r.token)
         return erro5(r.erro ?? "Falha no login.", 401);
-      return json6({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
+      return json7({ ok: true }, 200, { "Set-Cookie": cookieSessao(r.token, req) });
     }
     if (rota === "/api/admin/logout" && req.method === "POST")
-      return json6({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
+      return json7({ ok: true }, 200, { "Set-Cookie": cookieLimpo });
     if (rota === "/api/admin/sessao")
-      return json6({ autenticado: !!await sessaoDe(req) });
+      return json7({ autenticado: !!await sessaoDe(req) });
     if (rota.startsWith("/api/admin/")) {
       const eu = await sessaoDe(req);
       if (!eu)
         return erro5("Não autorizado.", 401);
-      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor)(\/|$)/.test(rota) && !eu.admin)
+      if (/^\/api\/admin\/(colaboradores|questoes|usuarios|respostas|mapa-calor|insights)(\/|$)/.test(rota) && !eu.admin)
         return erro5("Acesso restrito aos administradores.", 403);
       const usr = await rotasUsuarios(req, rota, eu);
       if (usr)
@@ -7099,6 +7469,9 @@ async function api(req) {
       const mapa = await rotasMapa(req, rota);
       if (mapa)
         return mapa;
+      const ins = await rotasInsights(req, rota);
+      if (ins)
+        return ins;
       const colab = await rotasColaboradores(req, rota);
       if (colab)
         return colab;
@@ -7107,7 +7480,7 @@ async function api(req) {
         return quest;
       if (rota === "/api/admin/registros") {
         const questoes = (await listarQuestoes()).map((q, i) => ({ id: q.id, numero: i + 1, enunciado: q.enunciado, ativa: q.ativa }));
-        return json6({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
+        return json7({ registros: await registros(), questoes, notaMinima: NOTA_MINIMA, eu: { nome: eu.nome, usuario: eu.usuario, admin: eu.admin } });
       }
       const id = /^\/api\/admin\/foto\/([\w-]+)$/.exec(rota)?.[1];
       if (id) {

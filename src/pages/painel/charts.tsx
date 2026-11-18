@@ -183,6 +183,29 @@ export function ColunasDuplas({ dados, inter }: { dados: Linha[]; inter?: Intera
   );
 }
 
+/** Duas séries de mesma unidade lado a lado (um eixo só); o zero não leva rótulo. */
+export function ColunasPares({ dados, series }: { dados: Linha[]; series: { chave: string; nome: string; cor: "serie" | "alerta" }[] }) {
+  const p = usePaleta();
+  if (!dados.length) return <Vazio />;
+  const cor = (c: "serie" | "alerta") => (c === "serie" ? p.serie : p.cats[1]!);
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={dados} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barGap={2} barCategoryGap="22%">
+        <CartesianGrid vertical={false} stroke={p.grade} />
+        <XAxis dataKey="nome" {...p.eixoX} interval={0} />
+        <YAxis hide />
+        <Tooltip {...p.tooltip} />
+        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: p.rotulo }} formatter={(v: string) => <span style={{ color: p.rotulo }}>{v}</span>} />
+        {series.map((sr) => (
+          <Bar key={sr.chave} dataKey={sr.chave} name={sr.nome} fill={cor(sr.cor)} radius={[4, 4, 0, 0]} maxBarSize={18} activeBar={{ fillOpacity: 0.8 }}>
+            <LabelList dataKey={sr.chave} position="top" offset={5} style={p.rotuloEstilo} formatter={(v: unknown) => (Number(v) ? String(v) : "")} />
+          </Bar>
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 /** Evolução no tempo: linha de 2px com um véu de 10%, marcadores com anel e o valor em cada ponto (poucos meses). */
 export function Linhas({ dados, chave = "valor", inter }: { dados: Linha[]; chave?: string; inter?: Interacao }) {
   const p = usePaleta();
