@@ -57,6 +57,7 @@ export default function MapaCalor() {
   const [base, setBase] = useState("");
   const [gerencia, setGerencia] = useState("");
   const [reinc, setReinc] = useState("");
+  const [porQtd, setPorQtd] = useState(false); // ordena por número de notificações depois da Escola
   const [busca, setBusca] = useState("");
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function MapaCalor() {
   }, [dados]);
   const anoAtivo = ano ?? anos[0] ?? new Date().getFullYear();
 
-  const linhas = useMemo<Linha[]>(() => {
+  const todas = useMemo<Linha[]>(() => {
     const q = chaveNome(busca);
     return (dados?.participantes ?? [])
       .map((p) => {
@@ -98,14 +99,26 @@ export default function MapaCalor() {
           l.participacoesAno > 0 &&
           (!base || l.p.base === base) &&
           (!gerencia || l.p.gerencia === gerencia) &&
-          (!reinc || (reinc === "sim" ? l.reincidencias > 0 : l.reincidencias === 0)) &&
           (!q || chaveNome(l.p.nome).includes(q)),
       );
-  }, [dados, anoAtivo, base, gerencia, reinc, busca]);
+  }, [dados, anoAtivo, base, gerencia, busca]);
 
-  const reincidentes = linhas.filter((l) => l.reincidencias > 0).length;
-  const totalReinc = linhas.reduce((a, l) => a + l.reincidencias, 0);
-  const taxa = linhas.length ? Math.round((reincidentes / linhas.length) * 100) : 0;
+  const linhas = useMemo(() => {
+    const f = todas.filter((l) => !reinc || (reinc === "sim" ? l.reincidencias > 0 : l.reincidencias === 0));
+    return porQtd ? [...f].sort((a, b) => b.reincidencias - a.reincidencias || a.p.nome.localeCompare(b.p.nome)) : f;
+  }, [todas, reinc, porQtd]);
+
+  const reincidentes = todas.filter((l) => l.reincidencias > 0).length;
+  const totalReinc = todas.reduce((a, l) => a + l.reincidencias, 0);
+  const taxa = todas.length ? Math.round((reincidentes / todas.length) * 100) : 0;
+
+  // cada card aplica um filtro; clicar de novo no card ativo (ou em "Participantes") volta para todos
+  const CARDS = [
+    { rotulo: "Participantes", valor: String(todas.length), cor: "var(--serie)", filtro: "", qtd: false, espelho: false, dica: "Mostrar todos os participantes" },
+    { rotulo: "Reincidiram", valor: String(reincidentes), cor: "var(--crit)", filtro: "sim", qtd: false, espelho: false, dica: "Mostrar só quem recebeu notificação depois da Escola" },
+    { rotulo: "Taxa de reincidência", valor: `${taxa}%`, cor: "var(--crit)", filtro: "sim", qtd: false, espelho: true, dica: "Mostrar quem reincidiu (a taxa é a parte deles entre os participantes)" },
+    { rotulo: "Notificações após a Escola", valor: String(totalReinc), cor: "var(--neutro)", filtro: "sim", qtd: true, espelho: false, dica: "Mostrar quem reincidiu, com mais notificações primeiro" },
+  ];
 
   const detalhe = (l: Linha, m: number) => {
     const c = l.meses[m]!;
@@ -122,10 +135,28 @@ export default function MapaCalor() {
   return (
     <div className="mapa">
       <div className="kpis">
-        <div className="kpi" style={{ ["--cor" as string]: "var(--serie)" }}><span>Participantes</span><strong>{linhas.length}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--crit)" }}><span>Reincidiram</span><strong>{reincidentes}</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--crit)" }}><span>Taxa de reincidência</span><strong>{taxa}%</strong></div>
-        <div className="kpi" style={{ ["--cor" as string]: "var(--neutro)" }}><span>Notificações após a Escola</span><strong>{totalReinc}</strong></div>
+        {CARDS.map((c) => {
+          // "Taxa" aplica o mesmo filtro de "Reincidiram", que é quem fica marcado
+          const ativo = !c.espelho && reinc === c.filtro && porQtd === c.qtd && (c.filtro !== "" || (!reinc && !porQtd));
+          return (
+            <button
+              key={c.rotulo}
+              type="button"
+              className={`kpi clicavel ${ativo ? "on" : ""}`}
+              style={{ ["--cor" as string]: c.cor }}
+              aria-pressed={ativo}
+              title={ativo && c.filtro ? "Clique para limpar o filtro" : c.dica}
+              onClick={() => {
+                const limpa = c.espelho ? false : ativo || !c.filtro;
+                setReinc(limpa ? "" : c.filtro);
+                setPorQtd(limpa ? false : c.qtd);
+              }}
+            >
+              <span>{c.rotulo}</span>
+              <strong>{c.valor}</strong>
+            </button>
+          );
+        })}
       </div>
 
       <section className="card tabela-card">
@@ -142,12 +173,12 @@ export default function MapaCalor() {
             <option value="">Todas as gerências</option>
             {GERENCIAS.map((g) => <option key={g}>{g}</option>)}
           </select>
-          <select value={reinc} onChange={(e) => setReinc(e.target.value)} aria-label="Reincidência">
+          <select value={reinc} onChange={(e) => { setReinc(e.target.value); setPorQtd(false); }} aria-label="Reincidência">
             <option value="">Reincidência: todos</option>
             <option value="sim">Reincidiram</option>
             <option value="nao">Não reincidiram</option>
           </select>
-          {(base || gerencia || reinc || busca) && <button className="limpar" onClick={() => { setBase(""); setGerencia(""); setReinc(""); setBusca(""); }}>Limpar</button>}
+          {(base || gerencia || reinc || busca) && <button className="limpar" onClick={() => { setBase(""); setGerencia(""); setReinc(""); setPorQtd(false); setBusca(""); }}>Limpar</button>}
         </div>
 
         <div className="mapa-legenda" aria-label="Legenda">

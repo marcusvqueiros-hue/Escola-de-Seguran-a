@@ -28,6 +28,8 @@ const ABAS = [
   { id: "usuarios", rotulo: "Usuários", soAdmin: true },
   { id: "configuracao", rotulo: "Colaboradores", soAdmin: true },
 ] as const;
+// os filtros gerais (ano, base, gerência...) valem só para estes relatórios; as demais abas têm filtros próprios
+const COM_FILTRO: string[] = ["escola", "avaliacao", "detalhamento"];
 const SO_ADMIN: string[] = ABAS.filter((a) => "soAdmin" in a).map((a) => a.id);
 type Aba = (typeof ABAS)[number]["id"];
 
@@ -183,7 +185,7 @@ export default function Painel() {
         </div>
       </header>
 
-      {!SO_ADMIN.includes(aba) && (
+      {COM_FILTRO.includes(aba) && (
       <section className="filtros">
         <button className="filtros-toggle" onClick={alternarFiltros} aria-expanded={filtrosAbertos}>
           <span>Filtros{nAtivos ? <b className="filtros-contagem">{nAtivos} ativo{nAtivos > 1 ? "s" : ""}</b> : null}</span>
