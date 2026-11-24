@@ -6858,15 +6858,25 @@ var mais = (m) => [...m].sort((a, b) => b[1] - a[1])[0]?.[0];
 async function rotasInsights(req, rota) {
   if (rota !== "/api/admin/insights" || req.method !== "GET")
     return null;
-  const regs = await registros();
+  const parametros = new URL(req.url).searchParams;
+  const fBase = (parametros.get("base") ?? "").trim().toUpperCase();
+  const fMes = /^\d{4}-\d{2}$/.test(parametros.get("mes") ?? "") ? parametros.get("mes") : "";
+  const primeiroNome = (n) => {
+    const k = chaveNome(n).split(" ")[0] ?? "";
+    return k === "SEM" ? "" : k;
+  };
+  const fCoord = primeiroNome(parametros.get("coordenador") ?? "");
+  const todasRegs = await registros();
+  const regsEscopo = todasRegs.filter((x) => (!fBase || x.base === fBase) && (!fCoord || primeiroNome(x.coordenador) === fCoord));
+  const regs = fMes ? regsEscopo.filter((x) => dia(x.data).startsWith(fMes)) : regsEscopo;
   const questoes = (await listarQuestoes()).filter((q) => q.ativa);
   const cadastro = await sql`SELECT nome_norm, base, gerencia, situacao, gerente FROM escola_colaboradores`;
-  const efetivo = cadastro.filter((c) => (c.situacao ?? "ATIVO") !== "DESLIGADO");
+  const efetivo = cadastro.filter((c) => (c.situacao ?? "ATIVO") !== "DESLIGADO" && (!fBase || c.base === fBase) && (!fCoord || primeiroNome(c.gerente ?? "") === fCoord));
   const cad = new Map(cadastro.map((c) => [c.nome_norm, c]));
-  let notif = [];
+  let notifTodas = [];
   let disponivel = true;
   try {
-    notif = (await sql`SELECT data::text AS data, base, gerencia, nao_conformidade, tratado, dias, status, coordenador, processo, eletricistas FROM notificacoes WHERE data IS NOT NULL`).map((n) => ({
+    notifTodas = (await sql`SELECT data::text AS data, base, gerencia, nao_conformidade, tratado, dias, status, coordenador, processo, eletricistas FROM notificacoes WHERE data IS NOT NULL`).map((n) => ({
       data: n.data,
       base: n.base ?? "",
       gerencia: n.gerencia ?? "",
@@ -6883,20 +6893,26 @@ async function rotasInsights(req, rota) {
       throw e;
     disponivel = false;
   }
-  const dMin = notif.reduce((a, n) => n.data < a ? n.data : a, "9999-12-31");
-  const dMax = notif.reduce((a, n) => n.data > a ? n.data : a, "0000-01-01");
-  const nomeDe = new Map;
-  const escola = new Map;
-  for (const r of [...regs].sort((a, b) => Date.parse(a.data) - Date.parse(b.data))) {
-    const k = chaveNome(r.nome);
-    const p = escola.get(k) ?? { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, dias: [], ultimaAprovada: r.aprovado, ultimoDia: "" };
-    p.dias.push(dia(r.data));
-    Object.assign(p, { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, ultimaAprovada: r.aprovado, ultimoDia: dia(r.data) });
-    escola.set(k, p);
-    nomeDe.set(k, r.nome);
-  }
+  const notifEscopo = notifTodas.filter((n) => (!fBase || n.base === fBase) && (!fCoord || primeiroNome(n.coord) === fCoord));
+  const notif = fMes ? notifEscopo.filter((n) => n.data.startsWith(fMes)) : notifEscopo;
+  const dMin = notifEscopo.reduce((a, n) => n.data < a ? n.data : a, "9999-12-31");
+  const dMax = notifEscopo.reduce((a, n) => n.data > a ? n.data : a, "0000-01-01");
+  const agruparEscola = (lista) => {
+    const m = new Map;
+    for (const x of [...lista].sort((a, b) => Date.parse(a.data) - Date.parse(b.data))) {
+      const k = chaveNome(x.nome);
+      const p = m.get(k) ?? { nome: x.nome, base: x.base, gerencia: x.gerencia, coordenador: x.coordenador, dias: [], ultimaAprovada: x.aprovado, ultimoDia: "" };
+      p.dias.push(dia(x.data));
+      Object.assign(p, { nome: x.nome, base: x.base, gerencia: x.gerencia, coordenador: x.coordenador, ultimaAprovada: x.aprovado, ultimoDia: dia(x.data) });
+      m.set(k, p);
+    }
+    return m;
+  };
+  const nomeDe = new Map(regsEscopo.map((x) => [chaveNome(x.nome), x.nome]));
+  const escola = agruparEscola(regsEscopo);
+  const escolaMes = fMes ? agruparEscola(regs) : escola;
   const porPessoa = new Map;
-  for (const n of notif) {
+  for (const n of notifEscopo) {
     for (const k of n.pessoas) {
       const p = porPessoa.get(k) ?? { datas: [], bases: new Map, ger: new Map };
       p.datas.push(n.data);
@@ -6956,9 +6972,9 @@ async function rotasInsights(req, rota) {
   const tempoAteEscola = demorasAteEscola.length ? Math.round(demorasAteEscola.reduce((a, b) => a + b, 0) / demorasAteEscola.length) : null;
   const mes = (d) => d.slice(0, 7);
   const meses = new Map;
-  for (const n of notif)
+  for (const n of notifEscopo)
     meses.set(mes(n.data), { notificacoes: (meses.get(mes(n.data))?.notificacoes ?? 0) + 1, participacoes: meses.get(mes(n.data))?.participacoes ?? 0 });
-  for (const r of regs) {
+  for (const r of regsEscopo) {
     const m = mes(dia(r.data));
     meses.set(m, { notificacoes: meses.get(m)?.notificacoes ?? 0, participacoes: (meses.get(m)?.participacoes ?? 0) + 1 });
   }
@@ -6986,7 +7002,7 @@ async function rotasInsights(req, rota) {
       if (n[campo])
         nots.set(n[campo], (nots.get(n[campo]) ?? 0) + 1);
     const part = new Map;
-    for (const p of escola.values())
+    for (const p of escolaMes.values())
       if (p[campo])
         part.set(p[campo], (part.get(p[campo]) ?? 0) + 1);
     const efet = new Map;
@@ -7009,7 +7025,7 @@ async function rotasInsights(req, rota) {
   const porGerencia = cobertura("gerencia");
   const aprovadas = regs.filter((r) => r.aprovado).length;
   const mediaNota = regs.length ? regs.reduce((a, r) => a + r.nota, 0) / regs.length : 0;
-  const repetentes = [...escola.values()].filter((p) => p.dias.length > 1).length;
+  const repetentes = [...escolaMes.values()].filter((p) => p.dias.length > 1).length;
   const reprovadosSemNova = [...escola.values()].filter((p) => !p.ultimaAprovada);
   const erros = questoes.map((q, i) => {
     let aplic = 0, err = 0;
@@ -7029,10 +7045,7 @@ async function rotasInsights(req, rota) {
   const convocar = [...porPessoa].filter(([k, p]) => !escola.has(k) && p.datas.length >= 2 && (cad.get(k)?.situacao ?? "ATIVO") !== "DESLIGADO").map(([k, p]) => ({ nome: nomeDe.get(k) ?? cad.get(k)?.nome_norm ?? k, chave: k, n: p.datas.length, base: cad.get(k)?.base || mais(p.bases) || "", gerencia: cad.get(k)?.gerencia || mais(p.ger) || "" })).sort((a, b) => b.n - a.n || a.chave.localeCompare(b.chave));
   const deslocar = (d, n) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10);
   const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-  const chaveCoord = (n) => {
-    const k = chaveNome(n).split(" ")[0] ?? "";
-    return k === "SEM" ? "" : k;
-  };
+  const chaveCoord = primeiroNome;
   const prioritarios = [...porPessoa].filter(([, p]) => p.datas.length >= 2);
   const notificadosQueParticiparam = [...porPessoa.keys()].filter((k) => escola.has(k)).length;
   const prioritariosQueParticiparam = prioritarios.filter(([k]) => escola.has(k)).length;
@@ -7076,7 +7089,7 @@ async function rotasInsights(req, rota) {
   const d180 = deslocar(dMax, -180);
   const tRec = new Map;
   const tAnt = new Map;
-  for (const n of notif) {
+  for (const n of notifEscopo) {
     if (!n.nc)
       continue;
     const t = temaDe(n.nc).nome;
@@ -7110,7 +7123,7 @@ async function rotasInsights(req, rota) {
     cNot.set(k, c);
   }
   const cPart = new Map;
-  for (const p of escola.values()) {
+  for (const p of escolaMes.values()) {
     const k = chaveCoord(p.coordenador);
     if (k)
       cPart.set(k, (cPart.get(k) ?? 0) + 1);
@@ -7418,16 +7431,17 @@ async function rotasInsights(req, rota) {
     });
   }
   const resumo = [];
-  resumo.push({ tipo: "neutro", texto: `${fmt(escola.size)} colaboradores participaram da Escola (${pct(escola.size, efetivoN)}% do efetivo cadastrado), com aprovação de ${pct(aprovadas, regs.length)}% nas participações.` });
+  resumo.push({ tipo: "neutro", texto: `${fmt(escolaMes.size)} colaboradores participaram da Escola${fMes ? " no mês" : ""} (${pct(escolaMes.size, efetivoN)}% do efetivo cadastrado), com aprovação de ${pct(aprovadas, regs.length)}% nas participações.` });
   if (disponivel) {
     resumo.push({
       tipo: funil.coberturaNotificados < 25 ? "alerta" : "neutro",
       texto: `Entre as ${fmt(funil.notificados)} pessoas notificadas no período, ${funil.coberturaNotificados}% já passaram pela Escola; entre as ${fmt(funil.prioritarios)} com 2 ou mais notificações, ${funil.coberturaPrioritarios}%.`
     });
     if (variacao != null) {
+      const pouca = escola.size < 10 ? " Com poucos participantes neste recorte, leia como pista e não como conclusão." : "";
       resumo.push({
         tipo: variacao < 0 ? "positivo" : "alerta",
-        texto: variacao < 0 ? `Quem participou teve ${Math.abs(variacao)}% menos notificações por pessoa-mês depois da Escola (${taxaAntes} para ${taxaDepois}), sinal favorável que ainda precisa de mais tempo de acompanhamento.` : `As notificações por pessoa-mês dos participantes subiram ${variacao}% depois da Escola (${taxaAntes} para ${taxaDepois}).`
+        texto: variacao < 0 ? `Quem participou teve ${Math.abs(variacao)}% menos notificações por pessoa-mês depois da Escola (${taxaAntes} para ${taxaDepois}), sinal favorável que ainda precisa de mais tempo de acompanhamento.${pouca}` : `As notificações por pessoa-mês dos participantes subiram ${variacao}% depois da Escola (${taxaAntes} para ${taxaDepois}).${pouca}`
       });
     }
     const lacuna = temas.find((t) => t.treinavel && t.questoes === 0 && t.pct >= 8);
@@ -7440,12 +7454,32 @@ async function rotasInsights(req, rota) {
   }
   const ordem = { alta: 0, media: 1, info: 2 };
   acoes.sort((a, b) => ordem[a.prioridade] - ordem[b.prioridade]);
+  const nomesCoord = new Map;
+  const marcar = (nome) => {
+    const k = primeiroNome(nome);
+    if (!k)
+      return;
+    const m = nomesCoord.get(k) ?? new Map;
+    m.set(nome.toUpperCase(), (m.get(nome.toUpperCase()) ?? 0) + 1);
+    nomesCoord.set(k, m);
+  };
+  for (const n of notifTodas)
+    marcar(n.coord);
+  for (const x of todasRegs)
+    marcar(x.coordenador);
+  const opcoes = {
+    bases: [...new Set([...todasRegs.map((x) => x.base), ...notifTodas.map((n) => n.base)])].filter(Boolean).sort(),
+    meses: [...new Set([...todasRegs.map((x) => dia(x.data).slice(0, 7)), ...notifTodas.map((n) => n.data.slice(0, 7))])].sort(),
+    coordenadores: [...nomesCoord].map(([chave, m]) => ({ chave, nome: mais(m) ?? chave })).sort((a, b) => a.nome.localeCompare(b.nome))
+  };
   return json5({
+    filtros: { base: fBase, mes: fMes, coordenador: fCoord },
+    opcoes,
     disponivel,
     periodo: { de: disponivel ? dMin : null, ate: disponivel ? dMax : null },
     programa: {
       participacoes: regs.length,
-      participantes: escola.size,
+      participantes: escolaMes.size,
       efetivo: efetivoN,
       cobertura: pct(escola.size, efetivoN),
       aprovacao: pct(aprovadas, regs.length),

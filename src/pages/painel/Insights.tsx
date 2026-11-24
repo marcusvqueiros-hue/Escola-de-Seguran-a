@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Cartao, Colunas, ColunasPares, ListaBarras } from "./charts";
 import { Info, type InfoTexto } from "./Info";
-import { MESES } from "./metrics";
+import { MESES, MESES_LONGO } from "./metrics";
 
 interface Acao {
   prioridade: "alta" | "media" | "info";
@@ -23,6 +23,8 @@ interface Cobertura {
 }
 
 interface Dados {
+  filtros: { base: string; mes: string; coordenador: string };
+  opcoes: { bases: string[]; meses: string[]; coordenadores: { chave: string; nome: string }[] };
   disponivel: boolean;
   periodo: { de: string | null; ate: string | null };
   programa: { participacoes: number; participantes: number; efetivo: number; cobertura: number; aprovacao: number; mediaNota: number; repetentes: number; reprovadosSemNova: number };
@@ -68,6 +70,11 @@ const ROTULO_PRIORIDADE = { alta: "Prioridade alta", media: "Prioridade média",
 
 /** Texto do ícone de informação de cada bloco: o que mostra, por que importa e como ler. */
 const INFO: Record<string, InfoTexto> = {
+  filtros: {
+    oque: "Recorta todo o relatório por base, mês e coordenador. Dá para combinar os três.",
+    importa: "Permite olhar uma base, uma coordenação ou um mês específico e decidir com os números daquele recorte.",
+    leitura: "Base e coordenador valem para tudo. O mês recorta notificações, participações, temas e coberturas; a efetividade (antes e depois), o funil e as listas de convocação comparam períodos, então usam todo o histórico da base ou do coordenador escolhido. Recortes pequenos têm poucos casos, então os percentuais variam muito.",
+  },
   resumo: {
     oque: "As conclusões principais do relatório, escritas em frases curtas e geradas a partir dos dados de hoje.",
     importa: "Dá a leitura de 30 segundos para quem decide: cobertura, efeito do programa, maior lacuna e capacidade de atendimento.",
@@ -184,20 +191,42 @@ function Secao({ titulo, texto }: { titulo: string; texto: string }) {
 export default function Insights() {
   const [d, setD] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(true);
   const [filtroAcao, setFiltroAcao] = useState<"todas" | Acao["prioridade"]>("todas");
+  const [fBase, setFBase] = useState("");
+  const [fMes, setFMes] = useState("");
+  const [fCoord, setFCoord] = useState("");
 
+  // refaz o cálculo no servidor a cada filtro; os dados anteriores ficam na tela (esmaecidos) até chegar o novo resultado
   useEffect(() => {
-    fetch("/api/admin/insights")
+    const ctl = new AbortController();
+    const qs = new URLSearchParams();
+    if (fBase) qs.set("base", fBase);
+    if (fMes) qs.set("mes", fMes);
+    if (fCoord) qs.set("coordenador", fCoord);
+    setCarregando(true);
+    fetch(`/api/admin/insights${qs.size ? `?${qs}` : ""}`, { signal: ctl.signal })
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.erro ?? "Falha ao carregar os insights.");
         setD(j);
+        setErro(null);
+        setCarregando(false);
       })
-      .catch((e) => setErro((e as Error).message));
-  }, []);
+      .catch((e) => {
+        if ((e as Error).name === "AbortError") return;
+        setErro((e as Error).message);
+        setCarregando(false);
+      });
+    return () => ctl.abort();
+  }, [fBase, fMes, fCoord]);
 
-  if (erro) return <p className="erro-msg">{erro}</p>;
+  if (erro && !d) return <p className="erro-msg">{erro}</p>;
   if (!d) return <p className="vazio">Calculando os insights…</p>;
+
+  const rotuloMes = (m: string) => `${MESES_LONGO[Number(m.slice(5)) - 1]}/${m.slice(0, 4)}`;
+  const nomeCoord = d.opcoes.coordenadores.find((c) => c.chave === fCoord)?.nome ?? fCoord;
+  const recorte = [fBase && `base ${fBase}`, fMes && rotuloMes(fMes), fCoord && `coordenador ${nomeCoord}`].filter(Boolean).join(" · ");
 
   const { programa: p, efetividade: ef, notificacoes: nt, funil, concentracao: co, ritmo } = d;
   const mes = d.porMes.map((m) => ({ nome: `${MESES[Number(m.mes.slice(5)) - 1]}/${m.mes.slice(2, 4)}`, notificacoes: m.notificacoes, participacoes: m.participacoes }));
@@ -216,7 +245,35 @@ export default function Insights() {
   const maxFunil = Math.max(...funil.etapas.map((e) => e.valor), 1);
 
   return (
-    <div className="insights">
+    <div className={`insights ${carregando ? "carregando-ins" : ""}`}>
+      <section className="ins-filtros" aria-label="Filtros do relatório">
+        <div className="ins-filtros-campos">
+          <label><span>Base</span>
+            <select value={fBase} onChange={(e) => setFBase(e.target.value)}>
+              <option value="">Todas as bases</option>
+              {d.opcoes.bases.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </label>
+          <label><span>Mês</span>
+            <select value={fMes} onChange={(e) => setFMes(e.target.value)}>
+              <option value="">Todos os meses</option>
+              {d.opcoes.meses.map((m) => <option key={m} value={m}>{rotuloMes(m)}</option>)}
+            </select>
+          </label>
+          <label><span>Coordenador</span>
+            <select value={fCoord} onChange={(e) => setFCoord(e.target.value)}>
+              <option value="">Todos os coordenadores</option>
+              {d.opcoes.coordenadores.map((c) => <option key={c.chave} value={c.chave}>{c.nome}</option>)}
+            </select>
+          </label>
+          {(fBase || fMes || fCoord) && <button type="button" className="limpar" onClick={() => { setFBase(""); setFMes(""); setFCoord(""); }}>Limpar filtros</button>}
+        </div>
+        <div className="ins-filtros-lado">
+          <span className="ins-recorte">{carregando ? "Calculando…" : recorte ? `Recorte: ${recorte}` : "Sem filtro: todos os dados"}</span>
+          <Info titulo="Filtros do relatório" texto={INFO.filtros!} />
+        </div>
+      </section>
+      {erro && <p className="erro-msg">{erro}</p>}
       {!d.disponivel && <p className="erro-msg">A tabela de notificações não foi encontrada neste banco; os insights mostram só os dados da Escola.</p>}
 
       <div className="kpis kpis-ins">
@@ -288,6 +345,7 @@ export default function Insights() {
             {ef.tempoAteEscola != null && <li>Da primeira notificação até a participação passam, em média, <b>{num(ef.tempoAteEscola)} dias</b>.</li>}
             <li>A referência (<b>{num(ef.taxaReferencia, 1)}</b>) é a de {num(ef.pessoasReferencia)} pessoas notificadas que não fizeram a Escola, contada a partir da primeira notificação.</li>
           </ul>
+          {ef.participantes < 10 && <p className="ins-nota ins-aviso">Amostra pequena: só {num(ef.participantes)} participante(s) neste recorte. Os percentuais podem variar muito com poucos casos; use como pista, não como conclusão.</p>}
           <p className="ins-nota">Leitura com cautela: a comparação é observacional, os participantes costumam ser escolhidos justamente por terem sido notificados, e a Escola começou em junho, então o tempo de acompanhamento depois da participação ainda é curto.</p>
         </Bloco>
       </div>
@@ -313,7 +371,7 @@ export default function Insights() {
         </Cartao>
       </div>
 
-      <Cartao titulo="Notificações e participações na Escola, por mês" subtitulo="Mesma unidade (quantidade) no mesmo eixo" alto={290} tabela={mes} info={INFO.mensal}>
+      <Cartao titulo="Notificações e participações na Escola, por mês" subtitulo={`Mesma unidade (quantidade) no mesmo eixo${fBase || fCoord ? " · todos os meses do recorte" : ""}`} alto={290} tabela={mes} info={INFO.mensal}>
         <ColunasPares dados={mes} series={[{ chave: "notificacoes", nome: "Notificações", cor: "alerta" }, { chave: "participacoes", nome: "Participações na Escola", cor: "serie" }]} />
       </Cartao>
 
