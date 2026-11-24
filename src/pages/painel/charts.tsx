@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTema } from "../../lib/tema";
 import type { Interacao } from "./cruzar";
+import { Info, type InfoTexto } from "./Info";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Legend, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 /** Papéis de cor usados no HTML (valem nos dois temas via CSS). */
@@ -94,7 +95,7 @@ const opac = (inter: Interacao | undefined, l: Linha) => (inter?.ha && !inter.at
 const ROTULOS_COLUNA: Record<string, string> = { nome: "Categoria", valor: "Quantidade", horas: "Horas", aprovados: "Aprovados", reprovados: "Reprovados" };
 
 /** Cartão de gráfico, com a tabela dos mesmos dados disponível (equivalente acessível do gráfico). */
-export function Cartao({ titulo, subtitulo, children, className = "", alto = 260, tabela }: { titulo: string; subtitulo?: string; children: ReactNode; className?: string; alto?: number | "auto"; tabela?: Record<string, unknown>[] }) {
+export function Cartao({ titulo, subtitulo, children, className = "", alto = 260, tabela, info }: { titulo: string; subtitulo?: string; children: ReactNode; className?: string; alto?: number | "auto"; tabela?: Record<string, unknown>[]; info?: InfoTexto }) {
   const [ver, setVer] = useState(false);
   const colunas = tabela?.length ? Object.keys(tabela[0]!).filter((k) => k !== "k") : [];
   return (
@@ -104,11 +105,14 @@ export function Cartao({ titulo, subtitulo, children, className = "", alto = 260
           <h3>{titulo}</h3>
           {subtitulo && <small>{subtitulo}</small>}
         </div>
-        {tabela && tabela.length > 0 && (
-          <button className={`card-tab ${ver ? "on" : ""}`} onClick={() => setVer((v) => !v)} aria-pressed={ver} title={ver ? "Ver gráfico" : "Ver tabela"} aria-label={ver ? "Ver gráfico" : "Ver tabela dos dados"}>
-            {ver ? "▥" : "▤"}
-          </button>
-        )}
+        <div className="card-icones">
+          {info && <Info titulo={titulo} texto={info} />}
+          {tabela && tabela.length > 0 && (
+            <button className={`card-tab ${ver ? "on" : ""}`} onClick={() => setVer((v) => !v)} aria-pressed={ver} title={ver ? "Ver gráfico" : "Ver tabela"} aria-label={ver ? "Ver gráfico" : "Ver tabela dos dados"}>
+              {ver ? "▥" : "▤"}
+            </button>
+          )}
+          </div>
       </header>
       <div className="card-corpo" style={alto === "auto" ? undefined : { height: alto }}>
         {ver && tabela ? (
