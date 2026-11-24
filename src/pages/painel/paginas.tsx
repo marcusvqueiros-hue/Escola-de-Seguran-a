@@ -20,7 +20,7 @@ export function KpisEscola({ regs }: { regs: Registro[] }) {
   const pessoas = useMemo(() => participacoes(regs), [regs]);
   return (
     <div className="kpis">
-      <Kpi rotulo="Participantes" valor={regs.length} cor={COR.vinho} />
+      <Kpi rotulo="Participações" valor={regs.length} cor={COR.vinho} />
       <Kpi rotulo="Horas treinadas" valor={regs.reduce((a, r) => a + r.horas, 0)} cor={COR.vinho} />
       <Kpi rotulo="Colaboradores" valor={pessoas.length} cor={COR.verde} />
       <Kpi rotulo="Reincidentes" valor={pessoas.filter((p) => p.qtd > 1).length} cor={COR.vermelho} />
@@ -74,16 +74,16 @@ export function PaginaEscola(props: PropsCruzadas) {
 
   return (
     <div className="grade-painel">
-      <Cartao titulo="Participantes por Mês" tabela={meses}><Colunas dados={meses} inter={inter("mes")} /></Cartao>
-      <Cartao titulo="Participantes por Base" tabela={bases}><Colunas dados={bases} inter={inter("base")} /></Cartao>
-      <Cartao titulo="Participantes por Gerência" tabela={gerencias}><Colunas dados={gerencias} inter={inter("gerencia")} /></Cartao>
+      <Cartao titulo="Participações por Mês" tabela={meses}><Colunas dados={meses} inter={inter("mes")} /></Cartao>
+      <Cartao titulo="Participações por Base" tabela={bases}><Colunas dados={bases} inter={inter("base")} /></Cartao>
+      <Cartao titulo="Participações por Gerência" tabela={gerencias}><Colunas dados={gerencias} inter={inter("gerencia")} /></Cartao>
       <Cartao titulo="Participação na Escola de Segurança" tabela={pessoas.map((x) => ({ nome: x.nome, valor: x.qtd }))} className="alta">
         <ListaBarras itens={pessoas.map((p) => ({ nome: p.nome, valor: p.qtd }))} max={Math.max(...pessoas.map((p) => p.qtd), 1)} destaque={(v) => (v > 1 ? COR.serie : COR.neutro)} inter={inter("pessoa")} />
       </Cartao>
       <Cartao titulo="Horas por Mês" tabela={meses}><Linhas dados={meses} chave="horas" inter={inter("mes")} /></Cartao>
       <Cartao titulo="Reincidência por Base" tabela={rBase}><Rosca dados={rBase} inter={inter("base")} /></Cartao>
       <Cartao titulo="Reincidência por Gerência" tabela={rGer}><Rosca dados={rGer} inter={inter("gerencia")} /></Cartao>
-      <Cartao titulo="Participantes por Coordenador" tabela={coordenadores} className="larga"><Colunas dados={coordenadores} inter={inter("coordenador")} /></Cartao>
+      <Cartao titulo="Participações por Coordenador" tabela={coordenadores} className="larga"><Colunas dados={coordenadores} inter={inter("coordenador")} /></Cartao>
       <Cartao titulo="Reincidência por Coordenador" tabela={rCoord}><Rosca dados={rCoord} inter={inter("coordenador")} /></Cartao>
     </div>
   );
