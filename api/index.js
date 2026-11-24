@@ -6860,13 +6860,13 @@ async function rotasInsights(req, rota) {
     return null;
   const regs = await registros();
   const questoes = (await listarQuestoes()).filter((q) => q.ativa);
-  const cadastro = await sql`SELECT nome_norm, base, gerencia, situacao FROM escola_colaboradores`;
+  const cadastro = await sql`SELECT nome_norm, base, gerencia, situacao, gerente FROM escola_colaboradores`;
   const efetivo = cadastro.filter((c) => (c.situacao ?? "ATIVO") !== "DESLIGADO");
   const cad = new Map(cadastro.map((c) => [c.nome_norm, c]));
   let notif = [];
   let disponivel = true;
   try {
-    notif = (await sql`SELECT data::text AS data, base, gerencia, nao_conformidade, tratado, dias, status, eletricistas FROM notificacoes WHERE data IS NOT NULL`).map((n) => ({
+    notif = (await sql`SELECT data::text AS data, base, gerencia, nao_conformidade, tratado, dias, status, coordenador, processo, eletricistas FROM notificacoes WHERE data IS NOT NULL`).map((n) => ({
       data: n.data,
       base: n.base ?? "",
       gerencia: n.gerencia ?? "",
@@ -6874,6 +6874,8 @@ async function rotasInsights(req, rota) {
       tratado: !!n.tratado,
       dias: n.dias == null ? null : Number(n.dias),
       status: String(n.status ?? ""),
+      coord: String(n.coordenador ?? "").trim(),
+      processo: String(n.processo ?? "").trim().toUpperCase(),
       pessoas: [...new Set((n.eletricistas ?? []).map((e) => chaveNome(String(e))))]
     }));
   } catch (e) {
@@ -6887,9 +6889,9 @@ async function rotasInsights(req, rota) {
   const escola = new Map;
   for (const r of [...regs].sort((a, b) => Date.parse(a.data) - Date.parse(b.data))) {
     const k = chaveNome(r.nome);
-    const p = escola.get(k) ?? { nome: r.nome, base: r.base, gerencia: r.gerencia, dias: [], ultimaAprovada: r.aprovado, ultimoDia: "" };
+    const p = escola.get(k) ?? { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, dias: [], ultimaAprovada: r.aprovado, ultimoDia: "" };
     p.dias.push(dia(r.data));
-    Object.assign(p, { nome: r.nome, base: r.base, gerencia: r.gerencia, ultimaAprovada: r.aprovado, ultimoDia: dia(r.data) });
+    Object.assign(p, { nome: r.nome, base: r.base, gerencia: r.gerencia, coordenador: r.coordenador, ultimaAprovada: r.aprovado, ultimoDia: dia(r.data) });
     escola.set(k, p);
     nomeDe.set(k, r.nome);
   }
@@ -6932,7 +6934,7 @@ async function rotasInsights(req, rota) {
     }
     if (d > 0) {
       reincidiram++;
-      reincidentes.push({ nome: p.nome, n: d, ultima: ns.sort().at(-1), base: p.base });
+      reincidentes.push({ nome: p.nome, n: d, ultima: ns.sort().at(-1), base: p.base, coord: p.coordenador });
     }
   }
   let ctrlN = 0, ctrlDias = 0, ctrlPessoas = 0;
@@ -7025,6 +7027,173 @@ async function rotasInsights(req, rota) {
   const diasMedios = notif.filter((n) => n.dias != null);
   const tempoResposta = diasMedios.length ? Math.round(diasMedios.reduce((a, n) => a + (n.dias ?? 0), 0) / diasMedios.length * 10) / 10 : null;
   const convocar = [...porPessoa].filter(([k, p]) => !escola.has(k) && p.datas.length >= 2 && (cad.get(k)?.situacao ?? "ATIVO") !== "DESLIGADO").map(([k, p]) => ({ nome: nomeDe.get(k) ?? cad.get(k)?.nome_norm ?? k, chave: k, n: p.datas.length, base: cad.get(k)?.base || mais(p.bases) || "", gerencia: cad.get(k)?.gerencia || mais(p.ger) || "" })).sort((a, b) => b.n - a.n || a.chave.localeCompare(b.chave));
+  const deslocar = (d, n) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10);
+  const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+  const chaveCoord = (n) => {
+    const k = chaveNome(n).split(" ")[0] ?? "";
+    return k === "SEM" ? "" : k;
+  };
+  const prioritarios = [...porPessoa].filter(([, p]) => p.datas.length >= 2);
+  const notificadosQueParticiparam = [...porPessoa.keys()].filter((k) => escola.has(k)).length;
+  const prioritariosQueParticiparam = prioritarios.filter(([k]) => escola.has(k)).length;
+  const aprovadosPessoas = [...escola.values()].filter((p) => p.ultimaAprovada).length;
+  const funil = {
+    etapas: [
+      { etapa: "Efetivo cadastrado", valor: efetivo.length },
+      ...disponivel ? [{ etapa: "Notificados ao menos 1 vez", valor: porPessoa.size }] : [],
+      { etapa: "Participaram da Escola", valor: escola.size },
+      { etapa: "Aprovados na última avaliação", valor: aprovadosPessoas },
+      ...disponivel ? [{ etapa: "Sem notificação depois da Escola", valor: escola.size - reincidiram }] : []
+    ],
+    notificados: porPessoa.size,
+    coberturaNotificados: pct(notificadosQueParticiparam, porPessoa.size),
+    prioritarios: prioritarios.length,
+    coberturaPrioritarios: pct(prioritariosQueParticiparam, prioritarios.length)
+  };
+  const contagens = [...porPessoa.values()].map((p) => p.datas.length).sort((a, b) => b - a);
+  const totalMencoes = contagens.reduce((a, b) => a + b, 0);
+  const faixaDe = (n) => n >= 4 ? "4 ou mais" : String(n);
+  const faixas = ["1", "2", "3", "4 ou mais"].map((f) => {
+    const doGrupo = contagens.filter((c) => faixaDe(c) === f);
+    const m = doGrupo.reduce((a, b) => a + b, 0);
+    return { faixa: f === "1" ? "1 notificação" : f === "4 ou mais" ? "4 ou mais" : `${f} notificações`, pessoas: doGrupo.length, mencoes: m, pctPessoas: pct(doGrupo.length, contagens.length), pctMencoes: pct(m, totalMencoes) };
+  });
+  const topPessoas = Math.max(1, Math.ceil(contagens.length * 0.1));
+  const concentracao = {
+    faixas,
+    totalPessoas: contagens.length,
+    totalMencoes,
+    top10Pessoas: topPessoas,
+    top10PctMencoes: pct(contagens.slice(0, topPessoas).reduce((a, b) => a + b, 0), totalMencoes)
+  };
+  const demoras = [
+    { faixa: "Até 30 dias", n: demorasAteEscola.filter((d) => d <= 30).length },
+    { faixa: "31 a 90 dias", n: demorasAteEscola.filter((d) => d > 30 && d <= 90).length },
+    { faixa: "91 a 180 dias", n: demorasAteEscola.filter((d) => d > 90 && d <= 180).length },
+    { faixa: "Mais de 180 dias", n: demorasAteEscola.filter((d) => d > 180).length }
+  ];
+  const d90 = deslocar(dMax, -90);
+  const d180 = deslocar(dMax, -180);
+  const tRec = new Map;
+  const tAnt = new Map;
+  for (const n of notif) {
+    if (!n.nc)
+      continue;
+    const t = temaDe(n.nc).nome;
+    if (n.data > d90)
+      tRec.set(t, (tRec.get(t) ?? 0) + 1);
+    else if (n.data > d180)
+      tAnt.set(t, (tAnt.get(t) ?? 0) + 1);
+  }
+  const tendenciaTemas = [...new Set([...tRec.keys(), ...tAnt.keys()])].map((tema) => {
+    const rec = tRec.get(tema) ?? 0;
+    const ant = tAnt.get(tema) ?? 0;
+    return { tema, anterior: ant, recente: rec, variacao: ant >= 5 ? Math.round((rec - ant) / ant * 100) : null, treinavel: TEMAS.find((x) => x.nome === tema)?.treinavel ?? false };
+  }).filter((t) => t.anterior + t.recente >= 8).sort((a, b) => b.recente - a.recente).slice(0, 8);
+  const temasTop = temas.filter((t) => t.tema !== "Outros").slice(0, 7).map((t) => t.tema);
+  const basesOrdem = porBase.map((b) => b.nome);
+  const baseTema = {
+    bases: basesOrdem,
+    temas: temasTop,
+    valores: temasTop.map((tema) => basesOrdem.map((b) => notif.filter((n) => n.base === b && n.nc && temaDe(n.nc).nome === tema).length))
+  };
+  const cNot = new Map;
+  for (const n of notif) {
+    const k = chaveCoord(n.coord);
+    if (!k)
+      continue;
+    const c = cNot.get(k) ?? { nomes: new Map, n: 0, pend: 0 };
+    c.n++;
+    if (!n.tratado)
+      c.pend++;
+    c.nomes.set(n.coord.toUpperCase(), (c.nomes.get(n.coord.toUpperCase()) ?? 0) + 1);
+    cNot.set(k, c);
+  }
+  const cPart = new Map;
+  for (const p of escola.values()) {
+    const k = chaveCoord(p.coordenador);
+    if (k)
+      cPart.set(k, (cPart.get(k) ?? 0) + 1);
+  }
+  const cEfet = new Map;
+  for (const c of efetivo) {
+    const k = chaveCoord(c.gerente ?? "");
+    if (k)
+      cEfet.set(k, (cEfet.get(k) ?? 0) + 1);
+  }
+  const cReinc = new Map;
+  for (const r of reincidentes) {
+    const k = chaveCoord(r.coord);
+    if (k)
+      cReinc.set(k, (cReinc.get(k) ?? 0) + 1);
+  }
+  const coordenadores = [...new Set([...cNot.keys(), ...cPart.keys()])].map((k) => {
+    const c = cNot.get(k);
+    return {
+      nome: c ? mais(c.nomes) ?? k : k,
+      notificacoes: c?.n ?? 0,
+      pctNotificacoes: pct(c?.n ?? 0, notif.length),
+      pendentes: c?.pend ?? 0,
+      tratadasPct: c?.n ? pct(c.n - c.pend, c.n) : 0,
+      participantes: cPart.get(k) ?? 0,
+      efetivo: cEfet.get(k) ?? 0,
+      cobertura: pct(cPart.get(k) ?? 0, cEfet.get(k) ?? 0),
+      reincidentes: cReinc.get(k) ?? 0
+    };
+  }).filter((c) => c.notificacoes > 0 || c.participantes > 0).sort((a, b) => b.notificacoes - a.notificacoes);
+  const pr = new Map;
+  for (const n of notif) {
+    if (!n.processo)
+      continue;
+    const v = pr.get(n.processo) ?? { n: 0, pend: 0 };
+    v.n++;
+    if (!n.tratado)
+      v.pend++;
+    pr.set(n.processo, v);
+  }
+  const processos = [...pr].map(([nome, v]) => ({ nome, n: v.n, pct: pct(v.n, notif.length), pendentes: v.pend })).sort((a, b) => b.n - a.n).slice(0, 8);
+  const palavras = (t) => new Set(semAcento(t).split(/\W+/).filter((w) => w.length > 3));
+  const jaccard = (a, b) => {
+    const inter = [...a].filter((x) => b.has(x)).length;
+    return a.size + b.size ? inter / (a.size + b.size - inter) : 0;
+  };
+  const textos = questoes.map((q) => palavras(`${q.enunciado} ${q.opcoes.join(" ")}`));
+  const qualidadeQuestoes = questoes.map((q, i) => {
+    let aplic = 0, err = 0;
+    for (const r of regs) {
+      const idx = r.questoes.indexOf(q.id);
+      if (idx < 0)
+        continue;
+      aplic++;
+      if (!r.acertos[idx])
+        err++;
+    }
+    const taxaErro = pct(err, aplic);
+    const nivel = aplic < 10 ? "Poucos dados" : taxaErro >= 60 ? "Muito difícil" : taxaErro >= 30 ? "Difícil" : taxaErro >= 10 ? "Adequada" : "Muito fácil";
+    const igual = textos.findIndex((t, j) => j < i && jaccard(t, textos[i]) >= 0.85);
+    return { numero: i + 1, enunciado: q.enunciado, tema: temaDe(`${q.enunciado} ${q.opcoes.join(" ")}`).nome, aplicadas: aplic, taxaErro, nivel, repeteDe: igual >= 0 ? igual + 1 : null };
+  });
+  const ab = new Map;
+  for (const r of regs) {
+    if (!r.base)
+      continue;
+    const v = ab.get(r.base) ?? { n: 0, ok: 0, soma: 0 };
+    v.n++;
+    if (r.aprovado)
+      v.ok++;
+    v.soma += r.nota;
+    ab.set(r.base, v);
+  }
+  const aprovacaoPorBase = [...ab].map(([nome, v]) => ({ nome, participacoes: v.n, aprovacao: pct(v.ok, v.n), media: Math.round(v.soma / v.n * 100) / 100 })).sort((a, b) => b.participacoes - a.participacoes);
+  const novos90 = [...escola.values()].filter((p) => p.dias[0] > deslocar(hoje, -90)).length;
+  const ritmoMes = Math.round(novos90 / 3 * 10) / 10;
+  const faltam = convocar.length;
+  const ritmo = {
+    novosPorMes: ritmoMes,
+    prioritariosPendentes: faltam,
+    mesesNoRitmoAtual: ritmoMes > 0 && faltam > 0 ? Math.ceil(faltam / ritmoMes) : null,
+    necessarioPorMes3Meses: Math.ceil(faltam / 3)
+  };
   const acoes = [];
   const fmt = (n) => n.toLocaleString("pt-BR");
   if (disponivel && convocar.length) {
@@ -7158,6 +7327,117 @@ async function rotasInsights(req, rota) {
       acao: variacao < 0 ? "O sinal é favorável; manter o ritmo de turmas e acompanhar nos próximos meses." : "Revisar conteúdo e método do treinamento e acompanhar os participantes em campo."
     });
   }
+  if (disponivel && faltam > 0 && ritmo.mesesNoRitmoAtual != null && ritmo.mesesNoRitmoAtual > 6) {
+    acoes.push({
+      prioridade: "alta",
+      tipo: "alerta",
+      titulo: `No ritmo atual, atender quem tem 2 ou mais notificações levaria ${ritmo.mesesNoRitmoAtual} meses`,
+      evidencia: `Entram cerca de ${fmt(ritmoMes)} participantes novos por mês e há ${fmt(faltam)} pessoas com 2 ou mais notificações aguardando. Para atendê-las em 3 meses seria preciso cerca de ${fmt(ritmo.necessarioPorMes3Meses)} por mês.`,
+      acao: "Aumentar a frequência e o tamanho das turmas (turmas semanais, em cada base) e começar por quem tem mais notificações; considerar uma versão presencial curta para o campo."
+    });
+  }
+  if (disponivel && concentracao.top10PctMencoes >= 25) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "oportunidade",
+      titulo: `10% das pessoas concentram ${concentracao.top10PctMencoes}% das notificações`,
+      evidencia: `${fmt(concentracao.top10Pessoas)} colaboradores, entre ${fmt(concentracao.totalPessoas)} notificados, aparecem em ${concentracao.top10PctMencoes}% das menções. Quem tem 4 ou mais notificações soma ${faixas[3].pessoas} pessoas.`,
+      acao: "Tratar esse grupo com um plano individual (acompanhamento do coordenador e treinamento prático), em vez de apenas a turma geral. É onde o ganho por pessoa é maior."
+    });
+  }
+  for (const t of tendenciaTemas.filter((x) => x.treinavel && x.variacao != null && x.variacao >= 40 && x.recente >= 8).slice(0, 2)) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "alerta",
+      titulo: `"${t.tema}" está crescendo nas notificações`,
+      evidencia: `${t.recente} notificações nos últimos 90 dias contra ${t.anterior} nos 90 anteriores (+${t.variacao}%).`,
+      acao: "Antecipar uma ação de reforço sobre o tema nas bases mais afetadas, antes que vire o principal problema do próximo trimestre."
+    });
+  }
+  if (disponivel && notif.length) {
+    const medCob = pct(escola.size, efetivo.length);
+    const fracos = coordenadores.filter((c) => c.pctNotificacoes >= 15 && c.cobertura < medCob * 0.6);
+    if (fracos.length) {
+      acoes.push({
+        prioridade: "media",
+        tipo: "alerta",
+        titulo: `Coordenação ${fracos.map((c) => c.nome).join(", ")} com muitas notificações e baixa participação`,
+        evidencia: fracos.map((c) => `${c.nome}: ${c.pctNotificacoes}% das notificações, ${c.participantes} participante(s) para ${fmt(c.efetivo)} do efetivo (${c.cobertura}%).`).join(" "),
+        acao: "Alinhar com o coordenador uma meta de participação e um calendário de turmas para a equipe."
+      });
+    }
+    const comPendencia = coordenadores.filter((c) => c.pendentes >= 5);
+    if (comPendencia.length) {
+      acoes.push({
+        prioridade: "media",
+        tipo: "alerta",
+        titulo: "Notificações sem tratamento concentradas em poucos coordenadores",
+        evidencia: `${comPendencia.reduce((a, c) => a + c.pendentes, 0)} das ${pendentes} pendências estão com ${comPendencia.length} coordenador(es).`,
+        acao: "Cobrar o tratamento dessas notificações na reunião de acompanhamento.",
+        itens: comPendencia.map((c) => `${c.nome} — ${c.pendentes} pendentes de ${c.notificacoes} (${c.tratadasPct}% tratadas)`)
+      });
+    }
+  }
+  const repetidas = qualidadeQuestoes.filter((q) => q.repeteDe != null);
+  if (repetidas.length) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "alerta",
+      titulo: "Questões praticamente repetidas na avaliação",
+      evidencia: repetidas.map((q) => `A questão ${q.numero} tem texto quase igual ao da questão ${q.repeteDe}`).join("; ") + ".",
+      acao: "Conferir se a repetição é intencional. Se não for, reescrever ou desativar uma delas na aba Questões, pois pesa duas vezes na nota sem medir um conhecimento novo."
+    });
+  }
+  const faceis = qualidadeQuestoes.filter((q) => q.nivel === "Muito fácil");
+  if (faceis.length) {
+    acoes.push({
+      prioridade: "info",
+      tipo: "oportunidade",
+      titulo: `${faceis.length} questão(ões) muito fácil(eis)`,
+      evidencia: `Menos de 10% de erro em ${faceis.map((q) => `Q${q.numero}`).join(", ")}: quase todos acertam.`,
+      acao: "Usar essas posições para temas ainda não cobertos (como EPI), com perguntas que realmente separem quem sabe de quem não sabe."
+    });
+  }
+  const fracasBase = aprovacaoPorBase.filter((b) => b.participacoes >= 8 && b.aprovacao < 70);
+  if (fracasBase.length) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "alerta",
+      titulo: `Aprovação baixa em ${fracasBase.map((b) => b.nome).join(", ")}`,
+      evidencia: fracasBase.map((b) => `${b.nome}: ${b.aprovacao}% de aprovação em ${b.participacoes} participações.`).join(" "),
+      acao: "Verificar se o conteúdo chega bem nessas bases (instrutor, horário, material) e reforçar antes de reaplicar."
+    });
+  }
+  if (disponivel && tempoAteEscola != null && tempoAteEscola > 90) {
+    acoes.push({
+      prioridade: "media",
+      tipo: "oportunidade",
+      titulo: `A Escola chega, em média, ${tempoAteEscola} dias depois da primeira notificação`,
+      evidencia: `Entre os participantes que já tinham notificação, a demora média foi de ${tempoAteEscola} dias.`,
+      acao: "Definir um prazo (por exemplo, 30 dias após a segunda notificação) para encaminhar à Escola, de forma que o treinamento acompanhe o desvio."
+    });
+  }
+  const resumo = [];
+  resumo.push({ tipo: "neutro", texto: `${fmt(escola.size)} colaboradores participaram da Escola (${pct(escola.size, efetivoN)}% do efetivo cadastrado), com aprovação de ${pct(aprovadas, regs.length)}% nas participações.` });
+  if (disponivel) {
+    resumo.push({
+      tipo: funil.coberturaNotificados < 25 ? "alerta" : "neutro",
+      texto: `Entre as ${fmt(funil.notificados)} pessoas notificadas no período, ${funil.coberturaNotificados}% já passaram pela Escola; entre as ${fmt(funil.prioritarios)} com 2 ou mais notificações, ${funil.coberturaPrioritarios}%.`
+    });
+    if (variacao != null) {
+      resumo.push({
+        tipo: variacao < 0 ? "positivo" : "alerta",
+        texto: variacao < 0 ? `Quem participou teve ${Math.abs(variacao)}% menos notificações por pessoa-mês depois da Escola (${taxaAntes} para ${taxaDepois}), sinal favorável que ainda precisa de mais tempo de acompanhamento.` : `As notificações por pessoa-mês dos participantes subiram ${variacao}% depois da Escola (${taxaAntes} para ${taxaDepois}).`
+      });
+    }
+    const lacuna = temas.find((t) => t.treinavel && t.questoes === 0 && t.pct >= 8);
+    if (lacuna)
+      resumo.push({ tipo: "oportunidade", texto: `A maior lacuna de conteúdo é "${lacuna.tema}": ${lacuna.pct}% das notificações e nenhuma questão na avaliação.` });
+    if (concentracao.top10PctMencoes >= 25)
+      resumo.push({ tipo: "oportunidade", texto: `Uma minoria concentra o problema: 10% dos notificados respondem por ${concentracao.top10PctMencoes}% das notificações.` });
+    if (ritmo.mesesNoRitmoAtual != null && ritmo.mesesNoRitmoAtual > 6)
+      resumo.push({ tipo: "alerta", texto: `No ritmo atual (${fmt(ritmoMes)} participantes novos por mês), atender quem tem 2 ou mais notificações levaria ${ritmo.mesesNoRitmoAtual} meses.` });
+  }
   const ordem = { alta: 0, media: 1, info: 2 };
   acoes.sort((a, b) => ordem[a.prioridade] - ordem[b.prioridade]);
   return json5({
@@ -7193,6 +7473,16 @@ async function rotasInsights(req, rota) {
     porBase,
     porGerencia,
     erros: erros.slice(0, 5),
+    funil,
+    concentracao,
+    demoras,
+    tendenciaTemas,
+    baseTema,
+    coordenadores,
+    processos,
+    qualidade: { questoes: qualidadeQuestoes, aprovacaoPorBase },
+    ritmo,
+    resumo,
     acoes
   });
 }
